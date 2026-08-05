@@ -11,6 +11,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { ProcessRail } from '../../components/common/ProcessRail';
 import { PerformanceAreaChart } from '../../components/charts/PerformanceAreaChart';
 import { AllocationDonut, ALLOCATION_COLORS } from '../../components/charts/AllocationDonut';
+import { LatestNewsCard } from '../../components/news/LatestNewsCard';
 import { formatCurrency, formatPercent, formatDateTime, deltaClass, orderQty } from '../../utils/format';
 import './trader-pages.css';
 
@@ -140,42 +141,8 @@ export function OverviewPage() {
       </div>
 
       <div className="overview-row-2">
-        <Card
-          title="Recent orders"
-          action={
-            <Link to="/trader/orders" className="btn btn-ghost btn-sm">
-              View all
-            </Link>
-          }
-        >
-          {recentOrders.length ? (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Ticker</th>
-                    <th>Side</th>
-                    <th>Qty</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.map((o) => (
-                    <tr key={o.id}>
-                      <td className="font-mono">{o.ticker}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{o.side}</td>
-                      <td className="mono-num">{orderQty(o)}</td>
-                      <td>
-                        <ProcessRail status={o.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="empty-state">No orders yet — head to Trade to place your first one.</div>
-          )}
+        <Card title="Latest news">
+          <LatestNewsCard />
         </Card>
 
         <Card title="Top movers">

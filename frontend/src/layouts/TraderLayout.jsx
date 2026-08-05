@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/common/Sidebar';
 import { Topbar } from '../components/common/Topbar';
 import { TickerTape } from '../components/common/TickerTape';
 import { useAuth } from '../context/AuthContext';
+import { useNewsStream } from '../hooks/useNewsStream';
 
 const NAV_ITEMS = [
   { to: '/trader/overview', label: 'Overview', icon: 'overview' },
@@ -37,10 +38,21 @@ export function TraderLayout() {
   const title = TITLES[location.pathname] || 'Shunryū STP';
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [newsNotificationCount, setNewsNotificationCount] = useState(0);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
+
+  // Monitor news stream for all major tickers
+  const tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL'];
+  tickers.forEach((ticker) => {
+    useNewsStream(ticker, (data) => {
+      if (data.articles && data.articles.length > 0) {
+        setNewsNotificationCount((prev) => Math.min(prev + data.articles.length, 99));
+      }
+    });
+  });
 
   return (
     <div className={`theme-dark role-trader dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isSidebarCollapsed && isSidebarHovered ? 'sidebar-hovered' : ''}`}>
@@ -53,7 +65,7 @@ export function TraderLayout() {
         onHoverChange={setIsSidebarHovered}
       />
       <div className="dashboard-main">
-        <Topbar title={title} user={user} />
+        <Topbar title={title} user={user} notificationCount={newsNotificationCount} />
         <TickerTape />
         <div className="dashboard-content">
           <Outlet />

@@ -260,17 +260,48 @@ class PriceHistoryMinute(Base):
 
 class NewsSentimentDaily(Base):
     __tablename__ = "news_sentiment_daily"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticker = Column(String, nullable=False, index=True)
     date = Column(DateTime, nullable=False)  # Date component only
     avg_sentiment = Column(Float, nullable=False)  # Average sentiment score for the day
     headline_count = Column(Integer, nullable=False)  # Number of headlines
-    
+
     # Unique constraint
     __table_args__ = (
         UniqueConstraint('ticker', 'date', name='uq_news_sentiment_ticker_date'),
     )
+
+
+class NewsItem(Base):
+    """
+    Individual news items with sentiment scores and ticker associations.
+    Used for real-time news feed and WebSocket broadcasting.
+    """
+    __tablename__ = "news_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=True)
+    source = Column(String, nullable=True, default="Alpha Vantage")
+    published_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    # Ticker and sentiment info (denormalized for fast queries)
+    ticker = Column(String, nullable=False, index=True)
+    sentiment_score = Column(Float, nullable=False)  # -1.0 to 1.0
+    sentiment_label = Column(String, nullable=False)  # Bearish, Neutral, Bullish
+    relevance_score = Column(Float, nullable=False)  # 0.0 to 1.0
+
+    # Topics
+    primary_topic = Column(String, nullable=True)
+
+    # Index for queries
+    __table_args__ = (
+        Index('ix_news_ticker_published', 'ticker', 'published_at'),
+        Index('ix_news_published', 'published_at'),
+    )
+
 
 
 class BacktestStrategy(Base):
