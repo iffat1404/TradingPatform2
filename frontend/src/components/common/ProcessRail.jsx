@@ -9,7 +9,7 @@ export const ORDER_STAGES = [
 ];
 
 /**
- * The Process Rail — Nomura STP's signature motif. An order really does move
+ * The Process Rail — Shunryū STP's signature motif. An order really does move
  * through this exact deterministic pipeline (see OrderStatus in the backend),
  * so the stepper reflects a real sequence rather than decorating one.
  */

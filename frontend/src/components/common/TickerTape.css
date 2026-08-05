@@ -120,6 +120,11 @@
   font-size: 12px;
 }
 
+.ticker-intraday {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 @keyframes ticker-scroll {
   from {
     transform: translateX(0);

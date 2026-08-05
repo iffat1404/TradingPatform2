@@ -39,7 +39,7 @@ export function LoginPage() {
       <aside className="auth-side">
         <div className="auth-side-top landing-brand">
           <span className="auth-side-mark">N</span>
-          <span className="font-mono landing-brand-name">NOMURA STP</span>
+          <span className="font-mono landing-brand-name">SHUNRYŪ STP</span>
         </div>
         <div className="auth-side-rail">
           <p className="auth-side-quote">
@@ -55,7 +55,7 @@ export function LoginPage() {
           </div>
         </div>
         <span className="eyebrow" style={{ color: 'var(--ink-300)' }}>
-          Nomura Tech Graduate Program
+          Shunryū Tech Graduate Program
         </span>
       </aside>
 

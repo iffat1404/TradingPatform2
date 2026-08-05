@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getPortfolioSummary, getPortfolioPnl, getPortfolioExposure, getTickerLots } from '../../api/portfolio';
 import { exportPortfolioCsv, getPortfolioReport } from '../../api/reports';
+import { getMarketCurrent } from '../../api/prices';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
-import { formatCurrency, formatPercent, formatDateTime, deltaClass } from '../../utils/format';
+import { formatCurrency, formatPercent, formatDateTime, deltaClass, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import { extractErrorMessage } from '../../api/client';
 import './trader-pages.css';
 
@@ -13,6 +14,7 @@ export function PortfolioPage() {
   const [portfolio, setPortfolio] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [exposure, setExposure] = useState(null);
+  const [marketData, setMarketData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lotsTicker, setLotsTicker] = useState(null);
@@ -24,13 +26,14 @@ export function PortfolioPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([getPortfolioSummary(), getPortfolioPnl(), getPortfolioExposure(), getPortfolioReport().catch(() => null)])
-      .then(([p, pl, ex, rep]) => {
+    Promise.all([getPortfolioSummary(), getPortfolioPnl(), getPortfolioExposure(), getPortfolioReport().catch(() => null), getMarketCurrent().catch(() => null)])
+      .then(([p, pl, ex, rep, market]) => {
         if (!active) return;
         setPortfolio(p);
         setPnl(pl);
         setExposure(ex);
         setReport(rep);
+        setMarketData(market);
       })
       .catch(() => active && setError('Could not load your portfolio.'))
       .finally(() => active && setLoading(false));
@@ -53,7 +56,7 @@ export function PortfolioPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'nomura-stp-portfolio.csv';
+      a.download = 'Shunryū-stp-portfolio.csv';
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -107,29 +110,44 @@ export function PortfolioPage() {
                   <th>Qty</th>
                   <th>Avg cost</th>
                   <th>Market value</th>
+                  <th>Day change %</th>
+                  <th>Intraday</th>
                   <th>Unrealized P&L</th>
                   <th>Realized P&L</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {positions.map((p) => (
-                  <tr key={p.ticker}>
-                    <td className="font-mono">{p.ticker}</td>
-                    <td className="mono-num">{p.signed_qty}</td>
-                    <td className="mono-num">{formatCurrency(p.avg_cost)}</td>
-                    <td className="mono-num">{p.market_value !== undefined ? formatCurrency(p.market_value) : '—'}</td>
-                    <td className={`mono-num ${deltaClass(p.unrealized_pnl)}`}>
-                      {p.unrealized_pnl !== undefined ? formatCurrency(p.unrealized_pnl) : '—'}
-                    </td>
-                    <td className={`mono-num ${deltaClass(p.realized_pnl)}`}>{formatCurrency(p.realized_pnl)}</td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" type="button" onClick={() => openLots(p.ticker)}>
-                        View lots
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {positions.map((p) => {
+                  const tickerData = marketData?.[p.ticker];
+                  const currentPrice = tickerData?.close || p.market_value / Math.abs(p.signed_qty);
+                  const dayChangePct = calculateTickerChange(currentPrice, tickerData?.previous_close || tickerData?.open);
+                  const intradayChange = calculateIntradayChange(currentPrice, tickerData?.open);
+                  
+                  return (
+                    <tr key={p.ticker}>
+                      <td className="font-mono">{p.ticker}</td>
+                      <td className="mono-num">{p.signed_qty}</td>
+                      <td className="mono-num">{formatCurrency(p.avg_cost)}</td>
+                      <td className="mono-num">{p.market_value !== undefined ? formatCurrency(p.market_value) : '—'}</td>
+                      <td className={`mono-num ${deltaClass(dayChangePct)}`}>
+                        {dayChangePct >= 0 ? '▲' : '▼'} {formatPercent(dayChangePct)}
+                      </td>
+                      <td className={`mono-num price-intraday ${deltaClass(intradayChange)}`}>
+                        {intradayChange >= 0 ? '+' : ''}{formatCurrency(intradayChange)}
+                      </td>
+                      <td className={`mono-num ${deltaClass(p.unrealized_pnl)}`}>
+                        {p.unrealized_pnl !== undefined ? formatCurrency(p.unrealized_pnl) : '—'}
+                      </td>
+                      <td className={`mono-num ${deltaClass(p.realized_pnl)}`}>{formatCurrency(p.realized_pnl)}</td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => openLots(p.ticker)}>
+                          View lots
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

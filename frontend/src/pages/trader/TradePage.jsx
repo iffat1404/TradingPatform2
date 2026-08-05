@@ -13,7 +13,7 @@ import { Field } from '../../components/common/Field';
 import { ProcessRail } from '../../components/common/ProcessRail';
 import { PriceChart } from '../../components/charts/PriceChart';
 import { toDailyPoints, toIntradayPoints, filterToSimulatedDay } from '../../utils/chartData';
-import { formatCurrency, formatDateTime, deltaClass, orderQty } from '../../utils/format';
+import { formatCurrency, formatDateTime, formatPercent, deltaClass, orderQty, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import { extractErrorMessage } from '../../api/client';
 import './trader-pages.css';
 
@@ -144,6 +144,16 @@ export function TradePage() {
               {ticker}
             </span>
             <span className="price-value mono-num">{formatCurrency(currentPrice)}</span>
+            {latest && (
+              <div className="price-metrics">
+                <span className={`mono-num ${deltaClass(calculateTickerChange(currentPrice, latest.previous_close || latest.open))}`}>
+                  {calculateTickerChange(currentPrice, latest.previous_close || latest.open) >= 0 ? '▲' : '▼'} {formatPercent(calculateTickerChange(currentPrice, latest.previous_close || latest.open))}
+                </span>
+                <span className={`mono-num price-intraday ${deltaClass(calculateIntradayChange(currentPrice, latest.open))}`}>
+                  {calculateIntradayChange(currentPrice, latest.open) >= 0 ? '+' : ''}{formatCurrency(calculateIntradayChange(currentPrice, latest.open))}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="chart-range-tabs">

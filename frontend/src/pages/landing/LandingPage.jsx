@@ -69,7 +69,7 @@ export function LandingPage() {
         <nav className="landing-nav">
           <div className="landing-brand">
             <span className="landing-mark">N</span>
-            <span className="font-mono landing-brand-name">NOMURA STP</span>
+            <span className="font-mono landing-brand-name">SHUNRYŪ STP</span>
           </div>
           <div className="landing-nav-links">
             <a href="#process">Product</a>
@@ -101,7 +101,7 @@ export function LandingPage() {
             Trade straight-through.
           </motion.h1>
           <motion.p className="landing-subcopy" variants={heroItem}>
-            Nomura STP is a paper-trading platform built on the same discipline as a real
+            Shunryū STP is a paper-trading platform built on the same discipline as a real
             order-management system: every order moves through a deterministic pipeline,
             validated and audited, with zero manual intervention — and $1,000,000 in virtual
             capital to practice with.
@@ -136,7 +136,7 @@ export function LandingPage() {
         <TickerTape />
 
         <section id="features" className="landing-features container">
-          <span className="eyebrow">Why traders choose Nomura STP</span>
+          <span className="eyebrow">Why traders choose Shunryū STP</span>
           <h2 className="font-display landing-section-title">Built like a real desk, sized for learning</h2>
           <motion.div
             className="landing-feature-grid"
@@ -205,10 +205,10 @@ export function LandingPage() {
             <div>
               <div className="landing-brand">
                 <span className="landing-mark">N</span>
-                <span className="font-mono landing-brand-name">NOMURA STP</span>
+                <span className="font-mono landing-brand-name">SHUNRYŪ STP</span>
               </div>
               <p className="landing-footer-note">
-                For the Nomura Tech Graduate Program. Simulated markets, simulated KYC — no real
+                For the Shunryū Tech Graduate Program. Simulated markets, simulated KYC — no real
                 funds, no real trades.
               </p>
             </div>

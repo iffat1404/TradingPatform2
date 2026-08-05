@@ -1,4 +1,4 @@
-export const formatCurrency = (value, { decimals = 2 } = {}) => {
+export const formatCurrency = (value, { decimals = 3 } = {}) => {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   const sign = value < 0 ? '-' : '';
   return `${sign}$${Math.abs(value).toLocaleString('en-US', {
@@ -28,6 +28,7 @@ export const formatDateTime = (value) => {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+      timeZone: 'UTC',
     });
   } catch {
     return value;
@@ -38,7 +39,7 @@ export const formatTime = (value) => {
   if (!value) return '—';
   try {
     const d = new Date(value.endsWith?.('Z') || value.includes?.('+') ? value : `${value}Z`);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'UTC' });
   } catch {
     return value;
   }
@@ -55,4 +56,16 @@ export const deltaClass = (value) => {
   if (value > 0) return 'delta-positive';
   if (value < 0) return 'delta-negative';
   return 'delta-neutral';
+};
+
+// Calculate standard ticker change % against previous close
+export const calculateTickerChange = (currentPrice, previousClose) => {
+  if (!currentPrice || !previousClose) return 0;
+  return ((currentPrice - previousClose) / previousClose) * 100;
+};
+
+// Calculate intraday change (current price - today's open)
+export const calculateIntradayChange = (currentPrice, openPrice) => {
+  if (!currentPrice || !openPrice) return 0;
+  return currentPrice - openPrice;
 };

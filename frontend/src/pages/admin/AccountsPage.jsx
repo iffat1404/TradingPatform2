@@ -21,6 +21,16 @@ export function AccountsPage() {
     [accounts, search]
   );
 
+  const adminAccounts = useMemo(
+    () => filtered.filter((a) => a.role === 'admin'),
+    [filtered]
+  );
+
+  const traderAccounts = useMemo(
+    () => filtered.filter((a) => a.role === 'trader'),
+    [filtered]
+  );
+
   return (
     <div className="page-section">
       <div className="page-header">
@@ -37,26 +47,24 @@ export function AccountsPage() {
         />
       </div>
 
-      <Card>
+      <Card title="Admin accounts">
         {loading ? (
           <div className="loading-row">Loading accounts…</div>
-        ) : filtered.length ? (
+        ) : adminAccounts.length ? (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Username</th>
-                  <th>Role</th>
                   <th>KYC status</th>
                   <th>Cash balance</th>
                   <th>Created</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a) => (
+                {adminAccounts.map((a) => (
                   <tr key={a.id}>
                     <td>{a.username}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{a.role}</td>
                     <td>
                       <Badge tone={kycTone(a.kyc_status)}>{a.kyc_status}</Badge>
                     </td>
@@ -68,7 +76,40 @@ export function AccountsPage() {
             </table>
           </div>
         ) : (
-          <div className="empty-state">No accounts match "{search}".</div>
+          <div className="empty-state">No admin accounts match "{search}".</div>
+        )}
+      </Card>
+
+      <Card title="Trader accounts">
+        {loading ? (
+          <div className="loading-row">Loading accounts…</div>
+        ) : traderAccounts.length ? (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>KYC status</th>
+                  <th>Cash balance</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {traderAccounts.map((a) => (
+                  <tr key={a.id}>
+                    <td>{a.username}</td>
+                    <td>
+                      <Badge tone={kycTone(a.kyc_status)}>{a.kyc_status}</Badge>
+                    </td>
+                    <td className="mono-num">{formatCurrency(a.cash_balance)}</td>
+                    <td>{formatDateTime(a.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state">No trader accounts match "{search}".</div>
         )}
       </Card>
     </div>

@@ -6,7 +6,21 @@
   display: flex;
   flex-direction: column;
   padding: var(--space-5) var(--space-4);
-  min-height: 100vh;
+  position: fixed;
+  height: 100vh;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.sidebar.is-collapsed {
+  width: 76px;
+}
+
+.sidebar.is-collapsed.is-hovered {
+  width: 232px;
 }
 
 .sidebar-brand {
@@ -43,6 +57,82 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: var(--space-4);
+  right: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-toggle:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sidebar-toggle-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-toggle-line {
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-toggle-line-1 {
+  transform: rotate(45deg) translate(2px, 2px);
+}
+
+.sidebar-toggle-line-2 {
+  transform: rotate(-45deg) translate(2px, -2px);
+}
+
+.sidebar.is-collapsed .sidebar-brand-name,
+.sidebar.is-collapsed .sidebar-brand-role,
+.sidebar.is-collapsed .sidebar-link span:last-child,
+.sidebar.is-collapsed .sidebar-logout span:last-child {
+  display: none;
+}
+
+.sidebar.is-collapsed .sidebar-link,
+.sidebar.is-collapsed .sidebar-logout {
+  justify-content: center;
+}
+
+.sidebar.is-collapsed.is-hovered .sidebar-brand-name,
+.sidebar.is-collapsed.is-hovered .sidebar-brand-role,
+.sidebar.is-collapsed.is-hovered .sidebar-link span:last-child,
+.sidebar.is-collapsed.is-hovered .sidebar-logout span:last-child {
+  display: block;
+}
+
+.sidebar.is-collapsed.is-hovered .sidebar-link,
+.sidebar.is-collapsed.is-hovered .sidebar-logout {
+  justify-content: flex-start;
+}
+
+.sidebar.is-collapsed.is-hovered .sidebar-toggle {
+  right: -12px;
 }
 
 .sidebar-nav {

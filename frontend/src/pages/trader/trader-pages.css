@@ -116,6 +116,19 @@
   font-weight: 600;
 }
 
+.price-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: auto;
+  text-align: right;
+}
+
+.price-intraday {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .chart-range-tabs {
   display: flex;
   gap: var(--space-2);

@@ -22,8 +22,6 @@ export function useWebSocket(path, { enabled = true } = {}) {
     let timer = null;
     let attempt = 0;
 
-    // Detach handlers before closing so a teardown-triggered onclose can never schedule
-    // a reconnect for a socket this effect has already abandoned.
     const teardown = () => {
       if (!socket) return;
       socket.onopen = null;
@@ -50,7 +48,7 @@ export function useWebSocket(path, { enabled = true } = {}) {
       setStatus('connecting');
       try {
         socket = new WebSocket(`${wsBaseUrl}${path}`);
-      } catch {
+      } catch (err) {
         socket = null;
         scheduleReconnect();
         return;
@@ -76,7 +74,8 @@ export function useWebSocket(path, { enabled = true } = {}) {
         scheduleReconnect();
       };
       socket.onerror = () => {
-        // onclose always follows onerror; let it drive the reconnect.
+        if (cancelled) return;
+        // onclose always follows onerror; let it drive the reconnect
         try {
           socket?.close();
         } catch {

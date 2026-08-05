@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/common/Sidebar';
 import { Topbar } from '../components/common/Topbar';
@@ -33,11 +34,24 @@ const TITLES = {
 export function TraderLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const title = TITLES[location.pathname] || 'Nomura STP';
+  const title = TITLES[location.pathname] || 'Shunryū STP';
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
 
   return (
-    <div className="theme-dark role-trader dashboard-shell">
-      <Sidebar items={NAV_ITEMS} roleLabel="Trader Desk" onLogout={logout} />
+    <div className={`theme-dark role-trader dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isSidebarCollapsed && isSidebarHovered ? 'sidebar-hovered' : ''}`}>
+      <Sidebar 
+        items={NAV_ITEMS} 
+        roleLabel="Trader Desk" 
+        onLogout={logout}
+        isCollapsed={isSidebarCollapsed}
+        onToggle={toggleSidebar}
+        onHoverChange={setIsSidebarHovered}
+      />
       <div className="dashboard-main">
         <Topbar title={title} user={user} />
         <TickerTape />
