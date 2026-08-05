@@ -1,25 +1,31 @@
 // Daily bars come as { date: "2026-07-01", ... } — one point per trading day.
 export const toDailyPoints = (rows = []) =>
-  rows.map((r) => ({
-    label: r.date,
-    dateKey: r.date,
-    t: new Date(`${r.date}T00:00:00Z`).getTime(),
-    open: r.open,
-    high: r.high,
-    low: r.low,
-    close: r.close,
-    volume: r.volume,
-  }));
+  rows.map((r) => {
+    const timestamp = new Date(`${r.date}T00:00:00Z`).getTime();
+    return {
+      label: r.date,
+      dateKey: r.date,
+      t: timestamp,
+      timestamp,
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close,
+      volume: r.volume,
+    };
+  });
 
 // Intraday bars come as { timestamp: "2026-07-01 09:31:00", ... } — minute-level, no timezone
 // suffix, always UTC per the backend's own convention.
 export const toIntradayPoints = (rows = []) =>
   rows.map((r) => {
     const iso = `${r.timestamp.replace(' ', 'T')}Z`;
+    const timestamp = new Date(iso).getTime();
     return {
       label: r.timestamp.slice(11, 16),
       dateKey: r.timestamp.slice(0, 10),
-      t: new Date(iso).getTime(),
+      t: timestamp,
+      timestamp,
       open: r.open,
       high: r.high,
       low: r.low,

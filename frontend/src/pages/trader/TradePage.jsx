@@ -11,7 +11,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Field } from '../../components/common/Field';
 import { ProcessRail } from '../../components/common/ProcessRail';
-import { PriceChart } from '../../components/charts/PriceChart';
+import { KlineChart } from '../../components/charts/KlineChart';
 import { toDailyPoints, toIntradayPoints, filterToSimulatedDay } from '../../utils/chartData';
 import { formatCurrency, formatDateTime, formatPercent, deltaClass, orderQty, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import { extractErrorMessage } from '../../api/client';
@@ -191,7 +191,7 @@ export function TradePage() {
             </p>
           )}
 
-          <PriceChart data={chartPoints} height={360} />
+          <KlineChart data={chartPoints} height={400} ticker={ticker} isIntraday={chartMode === 'intraday'} />
         </Card>
 
         <Card title="Order ticket" className="order-ticket-card">

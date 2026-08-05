@@ -1,0 +1,206 @@
+/* KlineChart wrapper and container */
+.kline-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.kline-container {
+  width: 100%;
+  background-color: transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(70, 70, 70, 0.3);
+}
+
+/* Canvas rendering */
+.kline-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Data Display - Above Chart */
+.kline-data-display {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(18, 18, 17, 0.8) 0%, rgba(24, 24, 22, 0.6) 100%);
+  border: 1px solid rgba(70, 70, 70, 0.4);
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  order: -1;
+}
+
+.data-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.data-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background-color: rgba(10, 10, 10, 0.3);
+  border: 1px solid rgba(70, 70, 70, 0.3);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.data-item:hover {
+  background-color: rgba(10, 10, 10, 0.5);
+  border-color: rgba(70, 70, 70, 0.5);
+}
+
+.data-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(157, 157, 162, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-value {
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'IBM Plex Mono', 'Monaco', 'Courier New', monospace;
+  color: rgba(81, 169, 88, 0.95);
+  line-height: 1.2;
+}
+
+/* Color coding for different values */
+.data-item:nth-child(3) .data-value,
+.data-item:nth-child(4) .data-value {
+  color: rgba(234, 61, 61, 0.95);
+}
+
+.data-item:nth-child(5) .data-value,
+.data-item:nth-child(6) .data-value {
+  color: rgba(81, 169, 88, 0.95);
+}
+
+.data-item:nth-child(7) .data-value {
+  color: rgba(157, 157, 162, 0.8);
+}
+
+/* Indicator controls */
+.kline-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+}
+
+.indicator-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  border: 1px solid rgba(70, 70, 70, 0.5);
+  border-radius: 3px;
+  background-color: rgba(18, 18, 17, 0.8);
+  color: rgba(157, 157, 162, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  user-select: none;
+}
+
+.indicator-btn:hover {
+  border-color: rgba(100, 100, 100, 0.7);
+  background-color: rgba(24, 24, 22, 0.9);
+  color: rgba(157, 157, 162, 1);
+}
+
+.indicator-btn.active {
+  border-color: rgba(81, 169, 88, 0.8);
+  background-color: rgba(81, 169, 88, 0.15);
+  color: #51a958;
+  box-shadow: 0 0 0 1px rgba(81, 169, 88, 0.2);
+}
+
+.indicator-btn.active:hover {
+  border-color: rgba(81, 169, 88, 1);
+  background-color: rgba(81, 169, 88, 0.25);
+  box-shadow: 0 0 8px rgba(81, 169, 88, 0.2);
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .data-row {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .data-item {
+    padding: 5px 6px;
+  }
+
+  .data-label {
+    font-size: 9px;
+  }
+
+  .data-value {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .kline-controls {
+    gap: 4px;
+  }
+
+  .indicator-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .data-row {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+  }
+
+  .data-item {
+    padding: 4px 5px;
+  }
+
+  .data-label {
+    font-size: 8px;
+  }
+
+  .data-value {
+    font-size: 11px;
+  }
+
+  .kline-data-display {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .data-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .data-item {
+    padding: 4px;
+  }
+
+  .data-label {
+    font-size: 7px;
+  }
+
+  .data-value {
+    font-size: 10px;
+  }
+
+  .kline-data-display {
+    padding: 8px;
+  }
+}
+
+
