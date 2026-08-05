@@ -1,70 +1,68 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useMarketClock } from './useMarketClock';
 
-export function useNewsStream(ticker, onNewsUpdate) {
-  const ws = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const clock = useMarketClock();
+let globalNewsWs = null;
+const newsListeners = new Set();
 
-  const connect = useCallback(() => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      return;
-    }
+function connectGlobalNewsStream() {
+  if (globalNewsWs && globalNewsWs.readyState === WebSocket.OPEN) {
+    return globalNewsWs;
+  }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const host = window.location.host;
-    const url = `${protocol}://${host}/ws/news/${ticker}`;
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const host = window.location.host;
+  const url = `${protocol}://${host}/ws/news/all`;
 
-    try {
-      ws.current = new WebSocket(url);
+  try {
+    globalNewsWs = new WebSocket(url);
 
-      ws.current.onopen = () => {
-        console.log(`Connected to news stream for ${ticker}`);
-      };
+    globalNewsWs.onopen = () => {
+      console.log('Connected to global news stream');
+    };
 
-      ws.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'news_update' && onNewsUpdate) {
-            onNewsUpdate(data);
-          }
-        } catch (err) {
-          console.error('Error parsing news message:', err);
+    globalNewsWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'news_update') {
+          newsListeners.forEach((listener) => listener(data));
         }
-      };
-
-      ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-
-      ws.current.onclose = () => {
-        console.log(`Disconnected from news stream for ${ticker}`);
-        // Attempt reconnect after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, 3000);
-      };
-    } catch (err) {
-      console.error('Error connecting to news WebSocket:', err);
-    }
-  }, [ticker, onNewsUpdate]);
-
-  useEffect(() => {
-    connect();
-
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (ws.current) {
-        try {
-          ws.current.close();
-        } catch (e) {
-          console.error('Error closing WebSocket:', e);
-        }
+      } catch (err) {
+        console.error('Error parsing news message:', err);
       }
     };
-  }, [ticker, connect]);
 
-  return ws.current;
+    globalNewsWs.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    globalNewsWs.onclose = () => {
+      console.log('Disconnected from global news stream');
+      globalNewsWs = null;
+      setTimeout(() => {
+        connectGlobalNewsStream();
+      }, 3000);
+    };
+  } catch (err) {
+    console.error('Error connecting to news WebSocket:', err);
+  }
+
+  return globalNewsWs;
 }
+
+export function useNewsStream(onNewsUpdate) {
+  useEffect(() => {
+    connectGlobalNewsStream();
+
+    if (onNewsUpdate) {
+      newsListeners.add(onNewsUpdate);
+    }
+
+    return () => {
+      if (onNewsUpdate) {
+        newsListeners.delete(onNewsUpdate);
+      }
+    };
+  }, [onNewsUpdate]);
+
+  return globalNewsWs;
+}
+

@@ -47,14 +47,14 @@ export function LatestNewsCard() {
   }, []);
 
   const getSentimentIcon = (label) => {
-    if (label === 'Bullish') return '📈';
-    if (label === 'Bearish') return '📉';
+    if (label === 'Bullish' || label === 'Somewhat-Bullish') return '📈';
+    if (label === 'Bearish' || label === 'Somewhat-Bearish') return '📉';
     return '➡️';
   };
 
   const getSentimentColor = (label) => {
-    if (label === 'Bullish') return '#51a958';
-    if (label === 'Bearish') return '#ea3d3d';
+    if (label === 'Bullish' || label === 'Somewhat-Bullish') return '#51a958';
+    if (label === 'Bearish' || label === 'Somewhat-Bearish') return '#ea3d3d';
     return '#6d6a6a';
   };
 
@@ -84,16 +84,17 @@ export function LatestNewsCard() {
           <div key={article.id} className="news-item">
             <div className="news-header">
               <span className="font-mono news-ticker">{article.ticker}</span>
-              <span
-                className="sentiment-badge"
-                style={{
-                  color: getSentimentColor(article.sentiment_label),
-                  fontSize: '14px',
-                  fontWeight: '600',
-                }}
-              >
-                {getSentimentIcon(article.sentiment_label)} {article.sentiment_label}
-              </span>
+              <div className="sentiment-info">
+                <span
+                  className="sentiment-badge"
+                  style={{ color: getSentimentColor(article.sentiment_label) }}
+                >
+                  {getSentimentIcon(article.sentiment_label)} {article.sentiment_label}
+                </span>
+                <span className="sentiment-score">
+                  {(article.sentiment_score * 100).toFixed(1)}%
+                </span>
+              </div>
             </div>
             <p className="news-title">{article.title}</p>
             <div className="news-footer">
@@ -108,3 +109,5 @@ export function LatestNewsCard() {
     </div>
   );
 }
+
+

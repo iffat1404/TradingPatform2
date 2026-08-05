@@ -390,3 +390,83 @@ async def news_websocket(websocket: WebSocket, ticker: str):
             await websocket.close()
         except Exception:
             pass
+
+
+@router.websocket("/news/all")
+async def news_all_websocket(websocket: WebSocket):
+    """
+    Stream latest news articles for ALL tickers combined.
+    Broadcasts on minute boundaries with recent news items from all tickers.
+    """
+    await websocket.accept()
+    clock = get_market_clock()
+    client_id = f"news_all_{id(websocket)}"
+
+    last_broadcast_minute = None
+
+    def fetch_recent_news_all(db: Session):
+        """Fetch latest 10 news items across all tickers."""
+        from app.models.orm import NewsItem
+        from sqlalchemy import desc
+
+        articles = (
+            db.query(NewsItem)
+            .order_by(desc(NewsItem.published_at))
+            .limit(10)
+            .all()
+        )
+        return [
+            {
+                "id": a.id,
+                "title": a.title,
+                "ticker": a.ticker,
+                "sentiment_score": a.sentiment_score,
+                "sentiment_label": a.sentiment_label,
+                "relevance_score": a.relevance_score,
+                "published_at": a.published_at.isoformat() if a.published_at else None,
+                "source": a.source,
+            }
+            for a in articles
+        ]
+
+    try:
+        print(f"Client {client_id} connected to global news websocket")
+
+        while True:
+            simulated_now = clock.now()
+            current_minute = _extract_minute_key(simulated_now)
+
+            if current_minute != last_broadcast_minute:
+                try:
+                    news_items = _with_session(fetch_recent_news_all)
+
+                    payload = {
+                        "type": "news_update",
+                        "timestamp": simulated_now.isoformat(),
+                        "ticker": "ALL",
+                        "articles": news_items,
+                    }
+
+                    try:
+                        await websocket.send_json(payload)
+                        last_broadcast_minute = current_minute
+                    except Exception as e:
+                        print(f"Error sending news to client {client_id}: {e}")
+                        break
+
+                except Exception as e:
+                    print(f"Error fetching global news: {e}")
+
+            await asyncio.sleep(0.1)
+
+    except WebSocketDisconnect:
+        print(f"Client {client_id} disconnected from global news websocket")
+    except asyncio.CancelledError:
+        print(f"Client {client_id} connection cancelled for global news")
+    except Exception as e:
+        print(f"Error in global news websocket (client {client_id}): {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
