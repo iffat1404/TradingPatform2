@@ -1,0 +1,123 @@
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 880px) {
+  .auth-shell {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.auth-side {
+  background: var(--color-cape-cod);
+  color: var(--paper-100);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-10);
+}
+
+@media (max-width: 879px) {
+  .auth-side {
+    display: none;
+  }
+}
+
+.auth-side-top .landing-brand-name {
+  color: var(--paper-100);
+}
+
+.auth-side-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--envy-500);
+  color: var(--ink-950);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.auth-side-quote {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.4;
+  max-width: 380px;
+}
+
+.auth-side-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-side-rail-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border-left: 2px solid var(--ink-600);
+  padding-left: var(--space-4);
+}
+
+.auth-side-rail-track span {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+
+.auth-side-rail-track span.is-current {
+  color: var(--envy-300);
+}
+
+.auth-main {
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.auth-card h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  margin: 0;
+}
+
+.auth-card-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-footer-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.auth-footer-note a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}

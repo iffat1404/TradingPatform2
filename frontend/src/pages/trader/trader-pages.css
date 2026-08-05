@@ -1,0 +1,455 @@
+.overview-row-1,
+.overview-row-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 980px) {
+  .overview-row-1 {
+    grid-template-columns: 1.6fr 1fr 1fr;
+  }
+  .overview-row-2 {
+    grid-template-columns: 1.4fr 1fr 1fr;
+  }
+}
+
+.allocation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.allocation-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.market-mini-list,
+.mover-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.market-mini-list li,
+.mover-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.market-mini-list li:last-child,
+.mover-list li:last-child {
+  border-bottom: none;
+}
+
+.ai-summary-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ---- Trade page ---- */
+.trade-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 1100px) {
+  .trade-layout {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
+.ticker-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.ticker-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.ticker-pill.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.price-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.price-header .price-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.chart-range-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.chart-range-tabs button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chart-range-tabs button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.order-ticket {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.side-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.side-toggle button {
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12.5px;
+}
+
+.side-toggle button.buy.is-active {
+  background: color-mix(in srgb, var(--positive) 18%, transparent);
+  border-color: var(--positive);
+  color: var(--positive);
+}
+
+.side-toggle button.sell.is-active {
+  background: color-mix(in srgb, var(--negative) 18%, transparent);
+  border-color: var(--negative);
+  color: var(--negative);
+}
+
+.order-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.order-summary-row strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.kyc-gate-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  z-index: 5;
+}
+
+/* ---- Portfolio page ---- */
+.exposure-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.exposure-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.exposure-bar-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.exposure-bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ---- Analytics page ---- */
+.indicator-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 900px) {
+  .indicator-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.alert-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--negative);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+}
+
+/* ---- Backtesting page ---- */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- AI assistant page ---- */
+.ai-tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---- KYC page ---- */
+.kyc-status-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.dropzone {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.dropzone.is-dragging {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- Trading journal ---- */
+.journal-textarea {
+  height: auto;
+  min-height: 96px;
+  padding: var(--space-3) var(--space-4);
+  line-height: 1.55;
+  resize: vertical;
+  font-size: 14px;
+}
+
+.tag-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tag-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out),
+    background 0.15s var(--ease-out);
+}
+
+.tag-chip:hover:not(.is-static) {
+  color: var(--text);
+}
+
+.tag-chip.is-static {
+  cursor: default;
+}
+
+/* Selected state colour-codes by behavioural meaning, so a wall of chips still reads at
+   a glance: risk emotions warn, disciplined ones reassure. */
+.tag-chip.is-selected.tone-negative,
+.tag-chip.is-static.tone-negative {
+  border-color: var(--negative);
+  color: var(--negative);
+  background: color-mix(in srgb, var(--negative) 14%, transparent);
+}
+
+.tag-chip.is-selected.tone-positive,
+.tag-chip.is-static.tone-positive {
+  border-color: var(--positive);
+  color: var(--positive);
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+}
+
+.tag-chip.is-selected.tone-neutral,
+.tag-chip.is-static.tone-neutral {
+  border-color: var(--info);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+}
+
+.journal-provenance {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.journal-findings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.journal-finding {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--negative);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.journal-finding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.journal-finding p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.journal-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.journal-entry-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+
+.journal-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.journal-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.journal-trade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+
+.journal-entry-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.journal-rationale {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* ---- shared ---- */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 900px) {
+  .two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -1,0 +1,41 @@
+.market-pulse {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-muted);
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-400);
+}
+
+.pulse-dot.is-live {
+  background: var(--accent);
+  animation: pulse-beat 1.6s ease-in-out infinite;
+}
+
+.pulse-time {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pulse-speed {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+@keyframes pulse-beat {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}

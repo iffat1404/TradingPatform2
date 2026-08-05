@@ -1,0 +1,177 @@
+/* ---- compact rail (order rows) ---- */
+.rail-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.rail-node {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.2s var(--ease-out);
+}
+
+.rail-node.is-done {
+  background: var(--accent, var(--positive));
+}
+
+.rail-node.is-failed {
+  background: var(--negative);
+}
+
+.rail-connector {
+  width: 14px;
+  height: 2px;
+  background: var(--border);
+  transition: background 0.2s var(--ease-out);
+}
+
+.rail-connector.is-done {
+  background: var(--accent, var(--positive));
+}
+
+.rail-connector.is-failed {
+  background: var(--negative);
+}
+
+.rail-fail-label {
+  margin-left: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--negative);
+}
+
+/* ---- hero rail (landing page) ---- */
+.rail-hero {
+  width: 100%;
+  max-width: 460px;
+}
+
+.rail-hero-track {
+  position: relative;
+  height: 2px;
+  background: var(--border);
+  border-radius: var(--radius-full);
+  margin: 0 6px;
+  overflow: hidden;
+}
+
+/* Traveling light beam — a soft gradient sliver that sweeps the whole track on a loop,
+   layered under the real progress fill, to simulate continuous live order flow. */
+.rail-hero-beam {
+  position: absolute;
+  inset: 0;
+  width: 36%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 70%, transparent),
+    transparent
+  );
+  animation: rail-beam-sweep 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes rail-beam-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-hero-beam {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.rail-hero-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transition: width 0.9s var(--ease-out);
+}
+
+.rail-hero-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 25%, transparent);
+  transform: translate(-50%, -50%);
+  transition: left 0.9s var(--ease-out);
+}
+
+/* Pulsing "ping" ring on the current stage — reads as a live, active node rather than a
+   static marker. */
+.rail-hero-dot-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: rail-dot-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes rail-dot-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  75%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-hero-dot-ping {
+    animation: none;
+    display: none;
+  }
+}
+
+.rail-hero-stage {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.rail-hero-stage .rail-node {
+  width: 9px;
+  height: 9px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+}
+
+.rail-hero-stage .rail-node.is-done {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.rail-hero-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+}
+
+.rail-hero-labels .eyebrow {
+  transition: color 0.3s var(--ease-out);
+}
+
+.rail-hero-labels .eyebrow.is-active {
+  color: var(--accent);
+}

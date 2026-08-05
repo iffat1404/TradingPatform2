@@ -1,0 +1,392 @@
+.landing {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.landing-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--color-cape-cod);
+  color: var(--paper-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.landing-brand-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-8);
+  border-bottom: 1px solid var(--border);
+}
+
+.landing-nav-links {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.landing-nav-links a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.landing-nav-links a:hover {
+  color: var(--text);
+}
+
+.landing-nav-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+@media (max-width: 760px) {
+  .landing-nav-links {
+    display: none;
+  }
+}
+
+.landing-hero {
+  padding: var(--space-16) var(--space-6) var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 780px;
+}
+
+.landing-headline {
+  font-size: clamp(40px, 6vw, 68px);
+  line-height: 1.05;
+  font-weight: 600;
+  margin: var(--space-3) 0;
+}
+
+.landing-subcopy {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 620px;
+}
+
+.landing-cta-row {
+  display: flex;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 var(--space-8);
+}
+
+/* Primary CTA: glow on hover + arrow that slides on hover, independent of the button's
+   own hover scale (Framer Motion) so the two transforms never fight each other. */
+.btn-glow {
+  position: relative;
+  transition: box-shadow 0.25s var(--ease-out), filter 0.25s var(--ease-out);
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 14px 30px -10px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.btn-arrow {
+  display: inline-block;
+  margin-left: 6px;
+  transition: transform 0.25s var(--ease-out);
+}
+
+.btn-glow:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+.landing-rail-block {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.landing-features {
+  padding: var(--space-16) var(--space-6);
+}
+
+.landing-section-title {
+  font-size: clamp(26px, 3.4vw, 36px);
+  font-weight: 600;
+  margin: var(--space-2) 0 var(--space-8);
+  max-width: 640px;
+}
+
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--space-5);
+}
+
+.landing-feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  /* Vertical lift lives on the Framer Motion transform; only non-transform properties
+     are transitioned here so the two animation systems never clobber each other. */
+  transition: border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+}
+
+.landing-feature-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
+    0 22px 44px -28px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.landing-feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+  transition: background 0.25s var(--ease-out), color 0.25s var(--ease-out);
+}
+
+.landing-feature-card:hover .landing-feature-icon {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.landing-feature-card h3 {
+  font-size: 16px;
+  margin: 0 0 var(--space-2);
+}
+
+.landing-feature-card p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.landing-markets {
+  padding: 0 var(--space-6) var(--space-16);
+}
+
+.landing-markets-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-cape-cod);
+  color: var(--paper-100);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10);
+}
+
+.landing-markets-card .eyebrow {
+  color: var(--envy-300);
+}
+
+.landing-markets-card .landing-section-title,
+.landing-markets-card .landing-subcopy {
+  color: var(--paper-100);
+}
+
+.landing-markets-card .landing-subcopy {
+  opacity: 0.8;
+  max-width: 560px;
+}
+
+/* Subtle animated mesh-gradient watermark: three blurred blobs drifting slowly behind the
+   copy. Pure transform animation so it stays compositor-friendly and cheap. */
+.landing-markets-mesh {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mesh-blob {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.35;
+  will-change: transform;
+}
+
+.mesh-blob-a {
+  top: -120px;
+  left: -60px;
+  background: var(--envy-500);
+  animation: mesh-drift-a 16s ease-in-out infinite;
+}
+
+.mesh-blob-b {
+  bottom: -140px;
+  right: 10%;
+  background: var(--manatee-500);
+  animation: mesh-drift-b 20s ease-in-out infinite;
+}
+
+.mesh-blob-c {
+  top: 20%;
+  right: -100px;
+  width: 260px;
+  height: 260px;
+  background: var(--sienna-500);
+  opacity: 0.18;
+  animation: mesh-drift-c 24s ease-in-out infinite;
+}
+
+@keyframes mesh-drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(60px, 40px);
+  }
+}
+
+@keyframes mesh-drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-50px, -30px);
+  }
+}
+
+@keyframes mesh-drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-30px, 30px) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-blob {
+    animation: none;
+  }
+}
+
+.landing-markets-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.landing-markets-content .btn {
+  margin-top: var(--space-2);
+}
+
+/* Interactive ticker pills with a CSS-only tooltip (company name) on hover/focus. */
+.ticker-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+}
+
+.ticker-pill-badge {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid color-mix(in srgb, var(--paper-100) 25%, transparent);
+  background: color-mix(in srgb, var(--paper-100) 8%, transparent);
+  color: var(--paper-100);
+  cursor: default;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out),
+    background 0.2s var(--ease-out);
+}
+
+.ticker-pill-badge:hover,
+.ticker-pill-badge:focus-visible {
+  border-color: var(--envy-300);
+  background: color-mix(in srgb, var(--envy-500) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--envy-300) 50%, transparent),
+    0 0 18px color-mix(in srgb, var(--envy-500) 45%, transparent);
+}
+
+.ticker-pill-badge::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  background: var(--ink-950);
+  color: var(--paper-100);
+  border: 1px solid var(--ink-600);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: normal;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+
+.ticker-pill-badge:hover::after,
+.ticker-pill-badge:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.landing-footer {
+  border-top: 1px solid var(--border);
+  padding: var(--space-8) 0;
+}
+
+.landing-footer-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.landing-footer-note {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 360px;
+  margin: var(--space-3) 0 0;
+}
+
+.landing-footer-links {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.landing-footer-links a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 13px;
+}
