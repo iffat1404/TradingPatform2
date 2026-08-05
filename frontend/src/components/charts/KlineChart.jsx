@@ -8,7 +8,7 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
 
   // Active technical indicator toggles
   const [indicators, setIndicators] = useState({
-    MA: true,
+    MA: false,
     BOLL: false,
     MACD: false,
     RSI: false,
@@ -17,16 +17,14 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
 
   const [hoveredData, setHoveredData] = useState(null);
 
-  // Helper to re-apply active indicators when the chart instance re-initializes
+  // Helper to re-apply active indicators
   const applyIndicators = useCallback((chart, currentIndicators) => {
     Object.entries(currentIndicators).forEach(([name, isActive]) => {
       if (isActive) {
         try {
           if (name === 'MA' || name === 'BOLL') {
-            // Overlay indicators on main candle pane
             chart.createIndicator({ name, paneId: 'candle_pane' }, true);
           } else {
-            // Separate pane indicators
             chart.createIndicator({ name }, true);
           }
         } catch (e) {
@@ -44,7 +42,6 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
       const isCurrentlyActive = indicators[name];
 
       if (!isCurrentlyActive) {
-        // Create indicator
         if (name === 'MA' || name === 'BOLL') {
           chartRef.current.createIndicator({ name, paneId: 'candle_pane' });
         } else {
@@ -52,7 +49,6 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
         }
         setIndicators((prev) => ({ ...prev, [name]: true }));
       } else {
-        // Safe removal across all panes
         const allIndicators = chartRef.current.getIndicators() || [];
         allIndicators.forEach((ind) => {
           if (ind.name === name) {
@@ -72,10 +68,17 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
 
     return rawData.map((d) => {
       let ts = d.timestamp;
+
+      // Handle seconds vs milliseconds conversion if needed
+      if (ts && ts < 10000000000) {
+        ts = ts * 1000;
+      }
+
       if (!ts && d.label) {
         const parsed = new Date(d.label).getTime();
         ts = !isNaN(parsed) ? parsed : Date.now();
       }
+
       return {
         timestamp: ts || Date.now(),
         open: d.open ?? 0,
@@ -108,7 +111,7 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
 
       chart.setSymbol({
         ticker,
-        pricePrecision: 2,
+        pricePrecision: 3,
         volumePrecision: 0,
       });
 
@@ -117,7 +120,7 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
         type: isIntraday ? 'minute' : 'day',
       });
 
-      // Dark Theme Styling
+      // Styling
       chart.setStyles({
         candle: {
           upColor: '#51a958',
@@ -129,40 +132,41 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
         },
         grid: {
           show: true,
-          horizontal: { color: 'rgba(24, 24, 22, 0.5)', style: 'dashed', size: 1 },
-          vertical: { color: 'rgba(24, 24, 22, 0.5)', style: 'dashed', size: 1 },
+          horizontal: { color: 'rgba(70, 70, 70, 0.5)', style: 'dashed', size: 1 },
+          vertical: { color: 'rgba(70, 70, 70, 0.5)', style: 'dashed', size: 1 },
         },
         xAxis: {
-          axisLine: { color: 'rgba(70, 70, 70, 0.8)', size: 1 },
-          tickLine: { color: 'rgba(70, 70, 70, 0.6)', size: 1, length: 3 },
+          axisLine: { color: 'rgba(100, 100, 100, 0.6)', size: 1 },
+          tickLine: { color: 'rgba(100, 100, 100, 0.4)', size: 1, length: 3 },
           tickText: {
-            color: 'rgba(157, 157, 162, 0.9)',
+            color: '#6d6a6a',
             family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             size: 12,
-            weight: '400',
+            weight: '500',
           },
           title: { show: false },
         },
         yAxis: {
-          axisLine: { color: 'rgba(70, 70, 70, 0.8)', size: 1 },
-          tickLine: { color: 'rgba(70, 70, 70, 0.6)', size: 1, length: 3 },
+          axisLine: { color: 'rgba(100, 100, 100, 0.6)', size: 1 },
+          tickLine: { color: 'rgba(100, 100, 100, 0.4)', size: 1, length: 3 },
           tickText: {
-            color: 'rgba(157, 157, 162, 0.9)',
+            color: '#6d6a6a',
             family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             size: 12,
-            weight: '400',
+            weight: '500',
           },
           title: { show: false },
         },
-        background: { color: 'transparent' },
+        background: { color: 'rgba(20, 20, 18, 0.7)' },
         tooltip: {
           text: {
-            color: '#cdcdc9',
+            color: '#e8e8e8',
             family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             size: 12,
+            weight: '500',
           },
-          backgroundColor: 'rgba(10, 10, 10, 0.95)',
-          borderColor: 'rgba(70, 70, 70, 0.8)',
+          backgroundColor: 'rgba(15, 15, 14, 0.98)',
+          borderColor: 'rgba(100, 100, 100, 0.6)',
         },
         crosshair: {
           show: true,
@@ -201,41 +205,36 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
         },
       });
 
-      // Load initial dataset using v10 API
+      // Load initial dataset using DataLoader
       const formattedData = formatKlineData(data);
       chart.setDataLoader({
         getBars: ({ callback }) => {
           callback(formattedData);
         },
-        subscribeBar: ({ symbol, period, callback }) => {
-          // Real-time updates would go here
-        },
-        unsubscribeBar: ({ symbol, period }) => {
-          // Cleanup would go here
-        },
+        subscribeBar: () => {},
+        unsubscribeBar: () => {},
       });
 
       // Re-apply currently active indicators
       applyIndicators(chart, indicators);
 
-      // Subscribe to Crosshair Movement
+      // Subscribe to Crosshair Movement with exact raw timestamp extraction
       chart.subscribeAction('onCrosshairChange', (crosshairData) => {
         if (crosshairData && typeof crosshairData.dataIndex === 'number') {
           const dataList = chart.getDataList() || [];
           if (crosshairData.dataIndex >= 0 && crosshairData.dataIndex < dataList.length) {
             const kline = dataList[crosshairData.dataIndex];
-            const date = new Date(kline.timestamp);
 
-            const timeStr = isIntraday
-              ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-              : date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            // Preserve exact original string from props without timezone conversion
+            const rawItem = data[crosshairData.dataIndex];
+            const rawTimeString = rawItem?.label || rawItem?.time || rawItem?.timestamp || '';
 
             setHoveredData({
-              timestamp: timeStr,
-              open: kline.open?.toFixed(2) || '0.00',
-              high: kline.high?.toFixed(2) || '0.00',
-              low: kline.low?.toFixed(2) || '0.00',
-              close: kline.close?.toFixed(2) || '0.00',
+              timestamp: String(rawTimeString),
+              open: kline.open?.toFixed(3) || '0.000',
+              high: kline.high?.toFixed(3) || '0.000',
+              low: kline.low?.toFixed(3) || '0.000',
+              close: kline.close?.toFixed(3) || '0.000',
               volume: kline.volume?.toLocaleString?.() || '0',
             });
           }
@@ -268,23 +267,18 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
     } catch (e) {
       console.error('Error initializing KLineChart:', e);
     }
-  }, [ticker, isIntraday, applyIndicators, indicators]);
+  }, [ticker, isIntraday]);
 
-  // Update Data Smoothly without destroying/re-creating canvas
+  // Update Data smoothly without re-initializing canvas
   useEffect(() => {
     if (chartRef.current && data && data.length > 0) {
       const formattedData = formatKlineData(data);
-      // Update data loader with new data
       chartRef.current.setDataLoader({
         getBars: ({ callback }) => {
           callback(formattedData);
         },
-        subscribeBar: ({ symbol, period, callback }) => {
-          // Real-time updates
-        },
-        unsubscribeBar: ({ symbol, period }) => {
-          // Cleanup
-        },
+        subscribeBar: () => {},
+        unsubscribeBar: () => {},
       });
     }
   }, [data]);
@@ -338,9 +332,7 @@ export function KlineChart({ data = [], height = 500, ticker = 'AAPL', isIntrada
       <div
         ref={containerRef}
         className="kline-container"
-        style={{
-          height: `${height}px`,
-        }}
+        style={{ height: `${height}px` }}
       />
     </div>
   );
