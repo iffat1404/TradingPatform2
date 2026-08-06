@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 from sqlalchemy.orm import Session
-from app.models.orm import PriceHistoryDaily, PriceHistoryMinute, NewsSentimentDaily
+from app.models.orm import PriceHistoryDaily, PriceHistoryMinute, NewsSentimentDaily, NewsArticle
 from app.core.config import settings
 
 # Supported tickers per Section 2
@@ -178,6 +178,102 @@ def load_live_minute_data(db: Session, data_dir: str = "data") -> int:
     return total_rows
 
 
+def load_news_articles(db: Session, data_dir: str = "data") -> int:
+    """
+    Load individual news headlines into news_articles.
+
+    One row per (article, ticker) pair, which is the grain the source JSON scores at — a
+    single story can mention several tickers with different relevance and sentiment.
+    Complements load_news_sentiment_data, which only keeps the daily average.
+    """
+    import uuid
+
+    news_dirs = [d for d in Path(data_dir).glob("simulation_news_data*") if d.is_dir()]
+    if not news_dirs:
+        print(f"Warning: No news data directories found in {data_dir}")
+        return 0
+
+    # Skip entirely if already seeded, so this is safe to re-run on every startup.
+    if db.query(NewsArticle).count() > 0:
+        print(f"News articles already loaded ({db.query(NewsArticle).count()} rows), skipping")
+        return 0
+
+    total = 0
+    # The source JSON repeats some stories verbatim (same ticker, same publish time, same
+    # title), so collapse those rather than letting the unique constraint abort the load.
+    seen = set()
+    for news_dir in news_dirs:
+        for json_file in sorted(news_dir.glob("*.json")):
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as e:
+                print(f"Error reading {json_file.name}: {e}")
+                continue
+
+            if not isinstance(data, dict):
+                continue
+
+            batch = []
+            for date_key, articles in data.items():
+                try:
+                    date_dt = datetime.strptime(date_key, "%Y%m%d")
+                except ValueError:
+                    continue
+
+                for article in articles or []:
+                    title = (article.get("title") or "").strip()
+                    if not title:
+                        continue
+
+                    # "20260701T062006" -> datetime; fall back to the trading date.
+                    raw_time = article.get("time_published") or ""
+                    try:
+                        published_at = datetime.strptime(raw_time, "%Y%m%dT%H%M%S")
+                    except ValueError:
+                        published_at = date_dt
+
+                    topics = ",".join(
+                        t.get("topic", "") for t in (article.get("topics") or []) if t.get("topic")
+                    ) or None
+
+                    for ts in article.get("ticker_sentiment") or []:
+                        ticker = ts.get("ticker")
+                        if ticker not in SUPPORTED_TICKERS:
+                            continue
+                        try:
+                            relevance = float(ts.get("relevance_score", 0) or 0)
+                            sentiment = float(ts.get("ticker_sentiment_score", 0) or 0)
+                        except (TypeError, ValueError):
+                            continue
+
+                        key = (ticker, published_at, title)
+                        if key in seen:
+                            continue
+                        seen.add(key)
+
+                        batch.append(NewsArticle(
+                            id=str(uuid.uuid4()),
+                            ticker=ticker,
+                            date=date_dt,
+                            published_at=published_at,
+                            title=title,
+                            relevance_score=relevance,
+                            sentiment_score=sentiment,
+                            sentiment_label=ts.get("ticker_sentiment_label") or "Neutral",
+                            topics=topics,
+                        ))
+
+            if batch:
+                db.bulk_save_objects(batch)
+                db.commit()
+                total += len(batch)
+                print(f"  {json_file.name}: {len(batch)} ticker-relevant headlines")
+
+    print(f"Total news articles loaded: {total}")
+    return total
+
+
 def load_news_sentiment_data(db: Session, data_dir: str = "data") -> int:
     """
     Load news sentiment data from JSON files into news_sentiment_daily table.
@@ -316,7 +412,8 @@ def load_all_data(db: Session, data_dir: str = "data") -> dict:
     results = {
         "historical_daily": load_historical_daily_data(db, data_dir),
         "live_minute": load_live_minute_data(db, data_dir),
-        "news_sentiment": load_news_sentiment_data(db, data_dir)
+        "news_sentiment": load_news_sentiment_data(db, data_dir),
+        "news_articles": load_news_articles(db, data_dir),
     }
     
     print("Data ingestion complete.")

@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/common/Sidebar';
 import { Topbar } from '../components/common/Topbar';
 import { TickerTape } from '../components/common/TickerTape';
+import { LevelAlerts } from '../components/common/LevelAlerts';
 import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
@@ -41,6 +42,7 @@ export function TraderLayout() {
       <div className="dashboard-main">
         <Topbar title={title} user={user} />
         <TickerTape />
+        <LevelAlerts />
         <div className="dashboard-content">
           <Outlet />
         </div>

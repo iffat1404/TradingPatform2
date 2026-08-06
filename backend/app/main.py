@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, kyc, admin, orders, portfolio, reports, analytics, paper_trading, genai, journal, websockets, prices
+from app.api import auth, kyc, admin, orders, portfolio, reports, analytics, paper_trading, genai, journal, decision, news, levels, websockets, prices
 from app.core.db import engine, Base, SessionLocal
 from app.data.loaders import load_all_data
 from app.models.orm import PriceHistoryDaily, PriceHistoryMinute
@@ -68,6 +68,9 @@ app.include_router(prices.router, prefix="/api/prices", tags=["prices"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(paper_trading.router, prefix="/api/paper-trading", tags=["paper-trading"])
 app.include_router(genai.router, prefix="/api/genai", tags=["genai"])
+app.include_router(decision.router, prefix="/api/decision", tags=["decision"])
+app.include_router(news.router, prefix="/api/news", tags=["news"])
+app.include_router(levels.router, prefix="/api/levels", tags=["levels"])
 app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
 app.include_router(websockets.router, prefix="/ws", tags=["websockets"])
 

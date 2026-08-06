@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { getPortfolioSummary, getPortfolioPnl } from '../../api/portfolio';
 import { listOrders } from '../../api/orders';
 import { getMarketCurrent, TICKERS } from '../../api/prices';
-import { getPortfolioSummaryAi } from '../../api/genai';
 import { getPortfolioReport } from '../../api/reports';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { ProcessRail } from '../../components/common/ProcessRail';
+import { NewsFeed } from '../../components/common/NewsFeed';
 import { PerformanceAreaChart } from '../../components/charts/PerformanceAreaChart';
 import { AllocationDonut, ALLOCATION_COLORS } from '../../components/charts/AllocationDonut';
 import { formatCurrency, formatPercent, formatDateTime, deltaClass, orderQty } from '../../utils/format';
@@ -35,8 +35,6 @@ export function OverviewPage() {
   const [orders, setOrders] = useState([]);
   const [market, setMarket] = useState(null);
   const [perfSeries, setPerfSeries] = useState(null);
-  const [aiSummary, setAiSummary] = useState(null);
-  const [aiState, setAiState] = useState('idle');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -59,16 +57,6 @@ export function OverviewPage() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    setAiState('loading');
-    getPortfolioSummaryAi()
-      .then((res) => {
-        setAiSummary(res.summary);
-        setAiState('ready');
-      })
-      .catch(() => setAiState('unavailable'));
   }, []);
 
   if (loading) return <div className="loading-row">Loading your desk…</div>;
@@ -189,15 +177,15 @@ export function OverviewPage() {
           </ul>
         </Card>
 
-        <Card title="AI insights">
-          {aiState === 'loading' && <div className="loading-row">Reading your portfolio…</div>}
-          {aiState === 'unavailable' && (
-            <div className="empty-state">AI insights are unavailable right now — everything else on this page is unaffected.</div>
-          )}
-          {aiState === 'ready' && <p className="ai-summary-text">{aiSummary}</p>}
-          <Link to="/trader/ai-assistant" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}>
-            Open AI Assistant →
-          </Link>
+        <Card
+          title="Market news"
+          action={
+            <Link to="/trader/journal" className="btn btn-ghost btn-sm">
+              Journal
+            </Link>
+          }
+        >
+          <NewsFeed days={1} limit={12} minRelevance={0.1} />
         </Card>
       </div>
     </div>

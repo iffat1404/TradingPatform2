@@ -1,0 +1,34 @@
+.ft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ft-para,
+.ft-heading {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Model "headings" inside a small card are really just emphasised leads, so render them
+   as strong labels rather than large display text. */
+.ft-heading {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.ft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style: disc;
+}
+
+.ft-list li {
+  font-size: 13px;
+  line-height: 1.55;
+}

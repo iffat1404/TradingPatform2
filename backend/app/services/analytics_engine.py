@@ -7,6 +7,120 @@ from app.models.orm import PriceHistoryDaily, NewsSentimentDaily
 from app.core.config import settings
 
 
+def _last_valid(values) -> Optional[float]:
+    """Most recent non-None value from an indicator series."""
+    if not values:
+        return None
+    return next((v for v in reversed(values) if v is not None), None)
+
+
+def _latest_scalars(indicators: Dict) -> Dict[str, Optional[float]]:
+    """Collapse the parallel indicator arrays down to their latest scalar values."""
+    if not indicators:
+        return {k: None for k in (
+            "close", "sma_20", "sma_50", "ema_12", "ema_26", "rsi_14",
+            "macd", "macd_signal", "macd_hist", "bb_upper", "bb_middle", "bb_lower",
+        )}
+
+    macd = indicators.get("macd") or {}
+    bands = indicators.get("bollinger_bands") or {}
+    closes = indicators.get("close") or []
+
+    return {
+        "close": closes[-1] if closes else None,
+        "sma_20": _last_valid(indicators.get("sma_20")),
+        "sma_50": _last_valid(indicators.get("sma_50")),
+        "ema_12": _last_valid(indicators.get("ema_12")),
+        "ema_26": _last_valid(indicators.get("ema_26")),
+        "rsi_14": _last_valid(indicators.get("rsi_14")),
+        "macd": _last_valid(macd.get("macd")),
+        "macd_signal": _last_valid(macd.get("signal")),
+        "macd_hist": _last_valid(macd.get("histogram")),
+        "bb_upper": _last_valid(bands.get("upper")),
+        "bb_middle": _last_valid(bands.get("middle")),
+        "bb_lower": _last_valid(bands.get("lower")),
+    }
+
+
+def get_latest_indicators(db: Session, ticker: str) -> Dict[str, Optional[float]]:
+    """
+    Latest scalar value of every indicator for a ticker.
+
+    get_technical_indicators returns full parallel time-series arrays; scoring and
+    coaching only ever need the most recent point of each.
+    """
+    return _latest_scalars(get_technical_indicators(db, ticker))
+
+
+def get_recent_daily_bars(db: Session, ticker: str, limit: int = 30) -> List[PriceHistoryDaily]:
+    """Most recent `limit` daily OHLC bars for a ticker, oldest-first."""
+    rows = (
+        db.query(PriceHistoryDaily)
+        .filter(PriceHistoryDaily.ticker == ticker.upper())
+        .order_by(PriceHistoryDaily.date.desc())
+        .limit(limit)
+        .all()
+    )
+    return list(reversed(rows))
+
+
+def calculate_atr(db: Session, ticker: str, period: int = 14) -> Optional[float]:
+    """
+    Average True Range over the last `period` daily bars.
+
+    True range is the widest of: today's high-low, and each of high/low measured against
+    the previous close — so it captures overnight gaps that a plain high-low range misses.
+    """
+    bars = get_recent_daily_bars(db, ticker, limit=period + 1)
+    if len(bars) < 2:
+        return None
+
+    true_ranges = []
+    for previous, current in zip(bars, bars[1:]):
+        true_ranges.append(max(
+            current.high - current.low,
+            abs(current.high - previous.close),
+            abs(current.low - previous.close),
+        ))
+
+    if not true_ranges:
+        return None
+    return sum(true_ranges) / len(true_ranges)
+
+
+def calculate_atr_percent(db: Session, ticker: str, period: int = 14) -> Optional[float]:
+    """ATR as a percentage of the latest close — comparable across differently priced names."""
+    atr = calculate_atr(db, ticker, period)
+    if atr is None:
+        return None
+    bars = get_recent_daily_bars(db, ticker, limit=1)
+    if not bars or not bars[-1].close:
+        return None
+    return (atr / bars[-1].close) * 100.0
+
+
+def get_latest_sentiment(db: Session, ticker: str) -> Optional[Dict]:
+    """
+    Newest news-sentiment row for a ticker.
+
+    Centralises a query that was previously inlined in several places.
+    """
+    record = (
+        db.query(NewsSentimentDaily)
+        .filter(NewsSentimentDaily.ticker == ticker.upper())
+        .order_by(NewsSentimentDaily.date.desc())
+        .first()
+    )
+    if not record:
+        return None
+    return {
+        "ticker": record.ticker,
+        "date": record.date.strftime("%Y-%m-%d") if record.date else None,
+        "avg_sentiment": record.avg_sentiment,
+        "headline_count": record.headline_count,
+    }
+
+
 def calculate_sma(prices: List[float], period: int) -> List[Optional[float]]:
     """
     Calculate Simple Moving Average (SMA).
@@ -157,19 +271,16 @@ def get_technical_alerts(
         return []
     
     alerts = []
-    rsi_values = indicators["rsi_14"]
     macd_data = indicators["macd"]
-    bollinger_data = indicators["bollinger_bands"]
-    close_prices = indicators["close"]
-    
-    # Get most recent values (last non-None)
-    latest_rsi = next((v for v in reversed(rsi_values) if v is not None), None)
-    latest_macd = next((v for v in reversed(macd_data["macd"]) if v is not None), None)
-    latest_signal = next((v for v in reversed(macd_data["signal"]) if v is not None), None)
-    latest_close = close_prices[-1] if close_prices else None
-    latest_upper = next((v for v in reversed(bollinger_data["upper"]) if v is not None), None)
-    latest_lower = next((v for v in reversed(bollinger_data["lower"]) if v is not None), None)
-    
+
+    latest = _latest_scalars(indicators)
+    latest_rsi = latest["rsi_14"]
+    latest_macd = latest["macd"]
+    latest_signal = latest["macd_signal"]
+    latest_close = latest["close"]
+    latest_upper = latest["bb_upper"]
+    latest_lower = latest["bb_lower"]
+
     # RSI alerts
     if latest_rsi:
         if latest_rsi > settings.RSI_OVERBOUGHT:

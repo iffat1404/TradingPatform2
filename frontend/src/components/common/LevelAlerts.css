@@ -1,0 +1,58 @@
+.level-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6) 0;
+}
+
+.level-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* A stop is the one that costs money to ignore, so it gets the negative accent. */
+.level-alert-stop {
+  border-left: 3px solid var(--negative);
+}
+
+.level-alert-target {
+  border-left: 3px solid var(--positive);
+}
+
+.level-alert-kind {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.level-alert-stop .level-alert-kind {
+  color: var(--negative);
+}
+
+.level-alert-target .level-alert-kind {
+  color: var(--positive);
+}
+
+.level-alert-msg {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.level-alert-action {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.level-alert-buttons {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}

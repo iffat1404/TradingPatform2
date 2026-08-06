@@ -7,6 +7,7 @@ from app.models.orm import JournalEntry
 from app.models.schemas import JournalEntryCreate, JournalEntryUpdate, ALLOWED_EMOTIONAL_TAGS
 from app.services.journal_engine import (
     create_entry,
+    explain_news_thesis,
     generate_entry_feedback,
     generate_insights,
     serialize_entry,
@@ -121,6 +122,8 @@ def update_journal_entry(
 
     if update_data.rationale is not None:
         entry.rationale = update_data.rationale.strip()
+    if getattr(update_data, "news_article_id", None) is not None:
+        entry.news_article_id = update_data.news_article_id
     if update_data.emotional_tags is not None:
         entry.emotional_tags = _tags_to_str(update_data.emotional_tags)
 
@@ -152,3 +155,24 @@ def analyze_journal_entry(
     """Generate (or return cached) AI coaching feedback for one entry."""
     entry = _get_owned_entry(db, entry_id, current_user["account_id"])
     return generate_entry_feedback(db, entry, regenerate=regenerate)
+
+
+@router.post("/entries/{entry_id}/news-review")
+def review_entry_news(
+    entry_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Check the news thesis behind an entry: did the cited headline actually move the price,
+    and what else was published that day that the trader did not mention?
+
+    The verdict is deterministic; the AI layer only narrates it.
+    """
+    entry = _get_owned_entry(db, entry_id, current_user["account_id"])
+    if entry.news_article_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This entry does not cite a news headline.",
+        )
+    return explain_news_thesis(db, entry)

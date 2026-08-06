@@ -12,8 +12,10 @@ import { Button } from '../../components/common/Button';
 import { Field } from '../../components/common/Field';
 import { ProcessRail } from '../../components/common/ProcessRail';
 import { PriceChart } from '../../components/charts/PriceChart';
+import { DecisionPanel } from '../../components/common/DecisionPanel';
 import { toDailyPoints, toIntradayPoints, filterToSimulatedDay } from '../../utils/chartData';
 import { formatCurrency, formatDateTime, deltaClass, orderQty } from '../../utils/format';
+import { previewDecision } from '../../api/decision';
 import { extractErrorMessage } from '../../api/client';
 import './trader-pages.css';
 
@@ -40,8 +42,13 @@ export function TradePage() {
     type: prefill?.type === 'limit' ? 'limit' : 'market',
     qty: prefill?.quantity || 10,
     limitPrice: '',
+    targetPrice: '',
+    stopLoss: '',
     tif: 'DAY',
   });
+  const [decision, setDecision] = useState(null);
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [decisionError, setDecisionError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { tick } = useMarketTicker(ticker);
   const clock = useMarketClock();
@@ -97,6 +104,45 @@ export function TradePage() {
 
   const openOrders = useMemo(() => orders.filter((o) => OPEN_STATUSES.has(o.status)), [orders]);
 
+  // Score the decision as the ticket is filled in. Debounced so typing a quantity does not
+  // fire a request per keystroke, and advisory only — it never gates submission.
+  useEffect(() => {
+    const qty = Number(form.qty);
+    if (!kycApproved || !qty || qty <= 0) {
+      setDecision(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setDecisionLoading(true);
+    const timer = setTimeout(() => {
+      previewDecision({
+        ticker,
+        side: form.side,
+        quantity: qty,
+        price: estimatedPrice || undefined,
+        target_price: form.targetPrice ? Number(form.targetPrice) : undefined,
+        stop_loss: form.stopLoss ? Number(form.stopLoss) : undefined,
+      })
+        .then((res) => {
+          if (cancelled) return;
+          setDecision(res);
+          setDecisionError(false);
+        })
+        .catch(() => {
+          if (!cancelled) setDecisionError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setDecisionLoading(false);
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [ticker, form.side, form.qty, form.targetPrice, form.stopLoss, estimatedPrice, kycApproved]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -107,6 +153,8 @@ export function TradePage() {
         type: form.type,
         qty: Number(form.qty),
         limit_price: form.type === 'limit' ? Number(form.limitPrice) : undefined,
+        target_price: form.targetPrice ? Number(form.targetPrice) : undefined,
+        stop_loss: form.stopLoss ? Number(form.stopLoss) : undefined,
         time_in_force: form.tif,
       });
       toast.success(`${form.side === 'buy' ? 'Buy' : 'Sell'} order for ${ticker} submitted.`);
@@ -250,6 +298,31 @@ export function TradePage() {
               </Field>
             )}
 
+            <div className="form-grid">
+              <Field label="Target price" hint="Optional">
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="e.g. 250"
+                  value={form.targetPrice}
+                  onChange={(e) => setForm((f) => ({ ...f, targetPrice: e.target.value }))}
+                />
+              </Field>
+              <Field label="Stop loss" hint="Optional">
+                <input
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="e.g. 224"
+                  value={form.stopLoss}
+                  onChange={(e) => setForm((f) => ({ ...f, stopLoss: e.target.value }))}
+                />
+              </Field>
+            </div>
+
             <Field label="Time in force">
               <select className="select" value={form.tif} onChange={(e) => setForm((f) => ({ ...f, tif: e.target.value }))}>
                 <option value="DAY">Day</option>
@@ -274,6 +347,10 @@ export function TradePage() {
           </form>
         </Card>
       </div>
+
+      <Card>
+        <DecisionPanel decision={decision} loading={decisionLoading} error={decisionError} />
+      </Card>
 
       <Card title="Open orders">
         {openOrders.length ? (

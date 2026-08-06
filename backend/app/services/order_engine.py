@@ -133,7 +133,12 @@ def fill_order(
     
     # Transition order to FILLED
     transition_order_status(db, order, OrderStatus.FILLED, "FILL", f"Filled at ${fill_price:.2f}")
-    
+
+    # Auto-log this trade to the journal so the trader can annotate it later. Deterministic
+    # and non-committing — it joins this transaction, and never raises.
+    from app.services.journal_engine import auto_journal_fill
+    auto_journal_fill(db, order, fill)
+
     return fill
 
 

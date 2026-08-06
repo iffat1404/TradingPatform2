@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPortfolioSummaryAi, explainTicker, parseOrder, extractId } from '../../api/genai';
+import { getPortfolioSummaryAi, explainTicker, parseOrder, explainRejection } from '../../api/genai';
+import { listOrders } from '../../api/orders';
 import { TICKERS } from '../../api/prices';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Field } from '../../components/common/Field';
+import { FormattedText } from '../../components/common/FormattedText';
 import { useToast } from '../../context/ToastContext';
 import { extractErrorMessage } from '../../api/client';
 import './trader-pages.css';
@@ -24,9 +26,21 @@ export function AIAssistantPage() {
   const [parsed, setParsed] = useState(null);
   const [parseLoading, setParseLoading] = useState(false);
 
-  const [noteText, setNoteText] = useState('');
-  const [extracted, setExtracted] = useState(null);
-  const [extractLoading, setExtractLoading] = useState(false);
+  // Rejected orders are the most useful thing to explain — the platform's rejection codes
+  // (PRICE_COLLAR_BREACH, CONCENTRATION_LIMIT_EXCEEDED...) are opaque on their own.
+  const [rejected, setRejected] = useState([]);
+  const [rejectedId, setRejectedId] = useState('');
+  const [rejectionText, setRejectionText] = useState(null);
+  const [rejectionLoading, setRejectionLoading] = useState(false);
+
+  useEffect(() => {
+    listOrders({ status: 'REJECTED' })
+      .then((rows) => {
+        setRejected(rows || []);
+        if (rows?.length) setRejectedId(rows[0].id);
+      })
+      .catch(() => setRejected([]));
+  }, []);
 
   const runSummary = () => {
     setSummaryLoading(true);
@@ -39,7 +53,7 @@ export function AIAssistantPage() {
   const runExplain = () => {
     setExplainLoading(true);
     explainTicker(ticker)
-      .then((res) => setExplanation(res.explanation))
+      .then((res) => setExplanation(res.summary || res.explanation || null))
       .catch((err) => toast.error(extractErrorMessage(err, 'AI explanation is unavailable right now.')))
       .finally(() => setExplainLoading(false));
   };
@@ -60,15 +74,20 @@ export function AIAssistantPage() {
 
   const prefillTicket = () => {
     if (!draft) return;
-    navigate('/trader/trade', { state: { prefill: draft } });
+    // The model returns the limit as `price`; the ticket expects `limit_price`.
+    navigate('/trader/trade', {
+      state: { prefill: { ...draft, limit_price: draft.limit_price ?? draft.price } },
+    });
   };
 
-  const runExtract = () => {
-    setExtractLoading(true);
-    extractId(noteText)
-      .then(setExtracted)
-      .catch((err) => toast.error(extractErrorMessage(err, 'Could not extract an identifier from that text.')))
-      .finally(() => setExtractLoading(false));
+  const runRejection = () => {
+    const order = rejected.find((o) => o.id === rejectedId);
+    if (!order) return;
+    setRejectionLoading(true);
+    explainRejection(order.id)
+      .then((res) => setRejectionText(res.explanation || res.recommendation || null))
+      .catch((err) => toast.error(extractErrorMessage(err, 'Could not explain that rejection.')))
+      .finally(() => setRejectionLoading(false));
   };
 
   return (
@@ -90,7 +109,7 @@ export function AIAssistantPage() {
             <Button variant="secondary" onClick={runSummary} loading={summaryLoading}>
               Generate summary
             </Button>
-            {summary ? <div className="ai-output">{summary}</div> : null}
+            {summary ? <div className="ai-output"><FormattedText>{summary}</FormattedText></div> : null}
           </div>
         </Card>
 
@@ -108,7 +127,7 @@ export function AIAssistantPage() {
             <Button variant="secondary" onClick={runExplain} loading={explainLoading}>
               Explain {ticker}
             </Button>
-            {explanation ? <div className="ai-output">{explanation}</div> : null}
+            {explanation ? <div className="ai-output"><FormattedText>{explanation}</FormattedText></div> : null}
           </div>
         </Card>
 
@@ -140,25 +159,41 @@ export function AIAssistantPage() {
           </div>
         </Card>
 
-        <Card title="Extract an identifier">
+        <Card title="Why was my order rejected?">
           <div className="ai-tool-card">
-            <Field label="Paste a note or message">
-              <input
-                className="input"
-                placeholder="e.g. account ACC123 flagged for XYZ activity"
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-              />
-            </Field>
-            <Button variant="secondary" onClick={runExtract} loading={extractLoading} disabled={!noteText.trim()}>
-              Extract
-            </Button>
-            {extracted ? (
-              <div className="ai-output">
-                Account: {extracted.account_id || '—'} · Ticker: {extracted.ticker || '—'}
-                {extracted.confidence !== undefined ? ` · Confidence ${(extracted.confidence * 100).toFixed(0)}%` : ''}
+            {rejected.length ? (
+              <>
+                <Field label="Rejected order">
+                  <select
+                    className="select"
+                    value={rejectedId}
+                    onChange={(e) => setRejectedId(e.target.value)}
+                  >
+                    {rejected.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.ticker} {o.side} {o.qty ?? o.quantity} — {new Date(o.created_at).toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Button variant="secondary" onClick={runRejection} loading={rejectionLoading}>
+                  Explain this rejection
+                </Button>
+                {rejectionText ? (
+                  <div className="ai-output">
+                    <FormattedText>{rejectionText}</FormattedText>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="empty-state">
+                <span>No rejected orders — nothing to explain.</span>
+                <span className="field-hint" style={{ marginTop: 6 }}>
+                  If an order is ever refused (price collar, concentration limit, market
+                  closed), it will appear here with a plain-language explanation.
+                </span>
               </div>
-            ) : null}
+            )}
           </div>
         </Card>
       </div>

@@ -47,6 +47,10 @@ class OrderCreate(BaseModel):
     qty: int = Field(..., gt=0, description="Quantity of shares", alias="quantity")
     limit_price: Optional[float] = Field(None, description="Limit price (required for limit orders)")
     time_in_force: Optional[str] = Field("DAY", description="Time in force")
+    # Trade plan — optional, recorded for decision scoring and journaling. Not enforced:
+    # nothing auto-exits on these levels.
+    target_price: Optional[float] = Field(None, gt=0, description="Where you plan to take profit")
+    stop_loss: Optional[float] = Field(None, gt=0, description="Where you plan to cut the loss")
 
 
 class OrderResponse(BaseModel):
@@ -220,6 +224,7 @@ class JournalEntryCreate(BaseModel):
     ticker: Optional[str] = Field(None, description="Ticker for a standalone reflection")
     entry_type: str = Field("trade_note", description="trade_note or reflection")
     rationale: str = Field(..., min_length=1, description="Why you took (or skipped) this trade")
+    news_article_id: Optional[str] = Field(None, description="The headline that drove this decision")
     emotional_tags: Optional[List[str]] = Field(None, description="How you felt, from the allowed vocabulary")
 
 
@@ -228,6 +233,7 @@ class JournalEntryUpdate(BaseModel):
 
     rationale: Optional[str] = Field(None, min_length=1)
     emotional_tags: Optional[List[str]] = None
+    news_article_id: Optional[str] = None
 
 
 # Error Response Schema
@@ -238,3 +244,22 @@ class ErrorResponse(BaseModel):
 class ErrorCodeResponse(BaseModel):
     error_code: str
     message: str
+
+class DecisionPreviewRequest(BaseModel):
+    """A hypothetical trade to score. Nothing is executed."""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    ticker: str
+    side: OrderSide
+    qty: int = Field(..., gt=0, alias="quantity")
+    price: Optional[float] = Field(None, description="Defaults to the current market price")
+    target_price: Optional[float] = Field(None, gt=0)
+    stop_loss: Optional[float] = Field(None, gt=0)
+
+
+class OrderLevelsUpdate(BaseModel):
+    """Adjust the trade plan on an existing order."""
+    model_config = ConfigDict(from_attributes=True)
+
+    target_price: Optional[float] = Field(None, gt=0)
+    stop_loss: Optional[float] = Field(None, gt=0)

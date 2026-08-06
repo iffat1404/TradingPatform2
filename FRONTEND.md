@@ -157,6 +157,103 @@ Verified against the live server:
 
 `src/utils/format.js` has `orderQty()` and `shortId()` helpers for these.
 
+## Decision Intelligence Engine
+
+Scores the **quality of a trading decision** before execution — never which stock to buy.
+All scores and behavioural patterns are computed by deterministic rules; GenAI only narrates
+what those rules found (platform principle 1).
+
+Three settled product decisions:
+1. **Advisory only** — a poor score never blocks an order. `order_engine.validate_order`
+   remains the only thing that rejects.
+2. **Target price / stop loss are recorded, not enforced** — they feed scoring and
+   journaling; nothing auto-exits on them.
+3. **Every fill is auto-journaled** with a blank rationale and a UI prompt to annotate.
+   Manual entries still work. Journals stay trader-private (no admin visibility).
+
+**Scores** (`services/decision_engine.py`, no AI in that module):
+
+| Risk 0-100 (higher = riskier) | | Decision quality 0-100 (higher = better) | |
+|---|---|---|---|
+| Position concentration | 30% | Trade plan (target + stop set) | 35% |
+| Portfolio diversification (HHI) | 20% | Reward : risk ratio | 25% |
+| Technical stretch (RSI / Bollinger) | 20% | Position sizing | 20% |
+| Market volatility (ATR%) | 20% | Signal alignment | 10% |
+| News sentiment | 10% | Journaling discipline | 10% |
+
+Every factor returns `{key, label, weight, score, value, note}`, which is what powers the
+"Why this score?" breakdown and what the AI layer is handed to explain.
+
+**Behavioural patterns** (`services/journal_engine.detect_patterns`) — all deterministic,
+all sharing one `{flag, label, count, detail, examples}` shape: revenge trading,
+overtrading, recurring emotion tags, **plus** sizing up after consecutive losses, exiting
+winners before target, chasing rallies, and repeated plan changes.
+
+**API** (`api/decision.py`, prefix `/api/decision`):
+
+```
+POST /preview            score a hypothetical trade (?explain=true adds AI coaching)
+GET  /history            recent scores, for the trend chart
+GET  /order/{order_id}   stored snapshot for one order
+PATCH /api/orders/{id}/levels   adjust target/stop (audited as LEVELS_UPDATED events)
+```
+
+`/preview` is a separate endpoint on purpose: `POST /api/orders/` is bound to
+`response_model=OrderResponse`, which silently strips any extra key, and its rejection path
+raises before a score could be returned.
+
+**Frontend:** `components/common/DecisionPanel.jsx` (two gauges, grade, expandable factor
+breakdown; debounced 400ms live scoring on the Trade page),
+`components/common/DecisionTrend.jsx` (quality/risk over recent trades on the Journal page),
+`api/decision.js`.
+
+**Migration required.** `Base.metadata.create_all` never ALTERs existing tables, so run
+once against an existing database:
+
+```powershell
+python migrate_add_decision_intelligence.py   # idempotent
+```
+
+It adds `orders.target_price`, `orders.stop_loss`, `journal_entries.is_auto`. The
+`trade_decisions` table is created automatically on startup. SQLite cannot drop a NOT NULL
+constraint without rebuilding the table, so auto-logged entries store `rationale=""` rather
+than NULL — `needs_annotation` treats empty and NULL identically.
+
+## News-driven journaling
+
+The Overview page shows the **actual headlines** moving the simulated market (replacing the
+old AI-insights card). A trader reads the news, trades on it, records *which headline* drove
+the decision, and is later shown whether that news really moved the price.
+
+**Data.** The seed loader previously collapsed the news JSON into `NewsSentimentDaily`'s
+daily average and threw the headlines away. `NewsArticle` now stores one row per
+(article, ticker) pair — the grain the source scores at, since one story can mention several
+tickers with different relevance and sentiment. **4,122 rows** across 2026-07-01 to 08-31
+(396 exact duplicates in the source are collapsed).
+
+**Time integrity.** `GET /api/news/` never returns a headline published later than the
+MarketClock's current simulated moment — showing tomorrow's news would let a trader "predict"
+a move. Same rule the intraday chart follows.
+
+**The review** (`journal_engine.review_news_thesis`) is deterministic:
+- Compares the cited story's sentiment direction against the ticker's realised move from
+  that session's close to the next session with data.
+- Verdicts: `confirmed` / `contradicted` / `flat` / `no_signal` / `unknown`.
+- Lists same-day stories on the same ticker that were **more relevant** or **pointed the
+  other way** — i.e. what the trader overlooked while fixating on one headline.
+- Sets `tunnel_vision` when a contradicting story was ignored.
+
+GenAI only narrates that verdict; with no API key the review still works and reports
+`generated_by: "deterministic"`.
+
+**Gotchas.**
+- Daily bars stop at **2026-07-10** while news runs to **08-31**, so the price move is
+  measured from `PriceHistoryMinute` (covers 06-30 to 08-29) with a daily fallback.
+  Measuring from daily only would return `unknown` for 52 of 62 news days.
+- News starts **2026-07-01** but the MarketClock defaults to **2026-06-30**, so a fresh
+  session shows an empty feed. Move the session date forward under Admin -> Feed & Session.
+- `journal_entries.news_article_id` needs `migrate_add_decision_intelligence.py`.
+
 ## Routes
 
 ```

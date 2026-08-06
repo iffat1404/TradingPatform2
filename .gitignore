@@ -15,6 +15,7 @@ __pycache__/
 # Environment files
 .env
 .env.*
+!.env.example
 frontend/local.env
 
 # Backend uploads / dynamic data

@@ -13,11 +13,16 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.orm import JournalEntry, Order, Fill, OrderSide, OrderStatus
+from app.models.orm import (
+    JournalEntry, Order, OrderEvent, Fill, OrderSide, OrderStatus,
+    NewsArticle, PriceHistoryDaily, PriceHistoryMinute, LevelAlert,
+)
 from app.models.schemas import ALLOWED_EMOTIONAL_TAGS, ALLOWED_ENTRY_TYPES
-from app.services.genai_client import _get_claude_client
+from app.services.analytics_engine import get_recent_daily_bars
+from app.services.genai_client import _get_claude_client, GENAI_MODEL, capped_max_tokens, provider_label
 from app.services.market_clock import get_market_clock
 
 # Detection thresholds. Deliberately conservative — a flag is a prompt to reflect, not an
@@ -25,6 +30,11 @@ from app.services.market_clock import get_market_clock
 REVENGE_WINDOW_MINUTES = 30
 OVERTRADING_ORDERS_PER_DAY = 8
 RECENT_ORDER_LIMIT = 200
+CONSECUTIVE_LOSS_THRESHOLD = 2   # losing exits in a row before a size increase counts
+CHASE_RUNUP_PCT = 8.0            # rally size that makes a subsequent buy a "chase"
+CHASE_LOOKBACK_BARS = 5          # sessions the rally is measured over
+STOP_TINKER_THRESHOLD = 3        # plan edits on one order before it reads as tinkering
+STOP_ACTION_GRACE_MINUTES = 60   # how long after a stop alert an exit still counts as acting on it
 
 # Tags a trader self-reports that are worth surfacing back to them in aggregate.
 RISK_TAGS = {"fomo", "revenge", "greedy", "fearful", "anxious", "frustrated"}
@@ -57,12 +67,26 @@ def serialize_entry(entry: JournalEntry, order: Optional[Order] = None) -> Dict[
         "entry_type": entry.entry_type,
         "rationale": entry.rationale,
         "emotional_tags": _tags_to_list(entry.emotional_tags),
+        "is_auto": bool(getattr(entry, "is_auto", False)),
+        # Auto-logged entries start blank; empty and NULL both mean "not yet annotated".
+        "needs_annotation": not (entry.rationale or "").strip(),
         "ai_feedback": entry.ai_feedback,
         "ai_flags": _tags_to_list(entry.ai_flags),
         "ai_generated_by": entry.ai_generated_by,
         "ai_generated_at": entry.ai_generated_at,
         "created_at": entry.created_at,
         "updated_at": entry.updated_at,
+    }
+
+    # The headline the trader cited, if any — the UI shows it inline on the entry.
+    cited = entry.news_article
+    payload["news_article"] = None if cited is None else {
+        "id": cited.id,
+        "ticker": cited.ticker,
+        "title": cited.title,
+        "date": cited.date.strftime("%Y-%m-%d") if cited.date else None,
+        "sentiment_label": cited.sentiment_label,
+        "relevance_score": round(cited.relevance_score, 2),
     }
 
     linked = order if order is not None else entry.order
@@ -112,6 +136,7 @@ def create_entry(db: Session, account_id: str, data) -> JournalEntry:
         entry_type=entry_type,
         rationale=data.rationale.strip(),
         emotional_tags=_tags_to_str(data.emotional_tags),
+        news_article_id=getattr(data, "news_article_id", None) or None,
     )
     db.add(entry)
     db.commit()
@@ -140,13 +165,15 @@ def detect_patterns(db: Session, account_id: str) -> Dict[str, Any]:
     Deterministic behavioural analysis over this account's real trading history.
     No AI involved — this is the ground truth the coaching layer narrates.
     """
-    orders = (
+    # Take the most RECENT window, then restore chronological order for sequence analysis.
+    # (Ordering ascending before limiting would analyse the oldest orders forever.)
+    orders = list(reversed(
         db.query(Order)
         .filter(Order.account_id == account_id, Order.is_backtest == False)  # noqa: E712
-        .order_by(Order.created_at.asc())
+        .order_by(Order.created_at.desc())
         .limit(RECENT_ORDER_LIMIT)
         .all()
-    )
+    ))
     entries = (
         db.query(JournalEntry)
         .filter(JournalEntry.account_id == account_id)
@@ -227,6 +254,192 @@ def detect_patterns(db: Session, account_id: str) -> Dict[str, Any]:
             "examples": [{"tag": t, "count": c} for t, c in flagged_tag_counts.items()],
         })
 
+    # --- Sizing up after consecutive losses ---
+    # Classic tilt: after losses stack up, the next bet gets bigger to "win it back".
+    sizeup_events: List[Dict[str, Any]] = []
+    losing_streak = 0
+    last_qty: Optional[int] = None
+    for order in orders:
+        pnl = _fill_pnl_for_order(db, order)
+        if losing_streak >= CONSECUTIVE_LOSS_THRESHOLD and last_qty and order.qty > last_qty:
+            sizeup_events.append({
+                "ticker": order.ticker,
+                "order_id": order.id,
+                "qty": order.qty,
+                "previous_qty": last_qty,
+                "after_losses": losing_streak,
+            })
+            losing_streak = 0
+        if pnl is not None and order.side == OrderSide.SELL:
+            losing_streak = losing_streak + 1 if pnl < 0 else 0
+        if order.qty:
+            last_qty = order.qty
+
+    if sizeup_events:
+        findings.append({
+            "flag": "size_up_after_losses",
+            "label": "Position size grows after losses",
+            "count": len(sizeup_events),
+            "detail": (
+                f"{len(sizeup_events)} time(s) you increased order size straight after "
+                f"{CONSECUTIVE_LOSS_THRESHOLD}+ consecutive losing exits. Raising risk to "
+                "recover a loss is how a bad day becomes a bad week."
+            ),
+            "examples": sizeup_events[:3],
+        })
+
+    # --- Exiting winners before the stated target ---
+    # Only measurable when the trader actually recorded a target on the entry order.
+    early_exits: List[Dict[str, Any]] = []
+    for order in orders:
+        if order.side != OrderSide.SELL or order.status != OrderStatus.FILLED:
+            continue
+        pnl = _fill_pnl_for_order(db, order)
+        if pnl is None or pnl <= 0:
+            continue
+        entry_order = next(
+            (o for o in orders
+             if o.ticker == order.ticker
+             and o.side == OrderSide.BUY
+             and o.target_price
+             and o.created_at < order.created_at),
+            None,
+        )
+        if not entry_order:
+            continue
+        exit_fill = db.query(Fill).filter(Fill.order_id == order.id).first()
+        if exit_fill and exit_fill.fill_price < entry_order.target_price:
+            shortfall = entry_order.target_price - exit_fill.fill_price
+            early_exits.append({
+                "ticker": order.ticker,
+                "order_id": order.id,
+                "exit_price": round(exit_fill.fill_price, 2),
+                "target_price": round(entry_order.target_price, 2),
+                "left_on_table": round(shortfall * exit_fill.fill_qty, 2),
+            })
+
+    if early_exits:
+        total_left = sum(e["left_on_table"] for e in early_exits)
+        findings.append({
+            "flag": "exits_winners_early",
+            "label": "Winners closed before target",
+            "count": len(early_exits),
+            "detail": (
+                f"{len(early_exits)} profitable trade(s) were closed short of your own "
+                f"target, leaving roughly ${total_left:,.0f} on the table. Cutting winners "
+                "early while letting losers run is what turns a positive edge negative."
+            ),
+            "examples": early_exits[:3],
+        })
+
+    # --- Chasing: buying straight after a sharp rally ---
+    chase_events: List[Dict[str, Any]] = []
+    for order in orders:
+        if order.side != OrderSide.BUY:
+            continue
+        try:
+            bars = get_recent_daily_bars(db, order.ticker, limit=CHASE_LOOKBACK_BARS + 1)
+        except Exception:
+            continue
+        if len(bars) < 2 or not bars[0].close:
+            continue
+        run_up_pct = ((bars[-1].close - bars[0].close) / bars[0].close) * 100.0
+        if run_up_pct >= CHASE_RUNUP_PCT:
+            chase_events.append({
+                "ticker": order.ticker,
+                "order_id": order.id,
+                "run_up_pct": round(run_up_pct, 1),
+                "lookback_days": CHASE_LOOKBACK_BARS,
+            })
+
+    if chase_events:
+        by_ticker = sorted({e["ticker"] for e in chase_events})
+        findings.append({
+            "flag": "chasing_rallies",
+            "label": "Buying into sharp rallies",
+            "count": len(chase_events),
+            "detail": (
+                f"{len(chase_events)} buy(s) landed after a {CHASE_RUNUP_PCT:.0f}%+ run-up "
+                f"over {CHASE_LOOKBACK_BARS} sessions ({', '.join(by_ticker)}). Entering "
+                "post-rally leaves you buying other people's profit-taking."
+            ),
+            "examples": chase_events[:3],
+        })
+
+    # --- Adjusting the trade plan repeatedly on one order ---
+    # Each change is recorded as a LEVELS_UPDATED order event by the levels endpoint.
+    tinker_rows = (
+        db.query(OrderEvent.order_id, func.count(OrderEvent.id))
+        .join(Order, Order.id == OrderEvent.order_id)
+        .filter(
+            Order.account_id == account_id,
+            OrderEvent.reason.like("LEVELS_UPDATED%"),
+        )
+        .group_by(OrderEvent.order_id)
+        .all()
+    )
+    tinkered = [{"order_id": oid, "changes": n} for oid, n in tinker_rows if n >= STOP_TINKER_THRESHOLD]
+    if tinkered:
+        findings.append({
+            "flag": "stop_loss_tinkering",
+            "label": "Trade plan repeatedly moved",
+            "count": len(tinkered),
+            "detail": (
+                f"{len(tinkered)} order(s) had their target or stop changed "
+                f"{STOP_TINKER_THRESHOLD}+ times. Widening a stop mid-trade converts a "
+                "planned loss into an open-ended one."
+            ),
+            "examples": tinkered[:3],
+        })
+
+    # --- Stop reached, but the position was not closed ---
+    # The sharpest version of "did you follow your own plan": the level you set was hit,
+    # you were told, and the holding is still open.
+    stop_alerts = (
+        db.query(LevelAlert)
+        .filter(
+            LevelAlert.account_id == account_id,
+            LevelAlert.kind == "stop",
+        )
+        .order_by(LevelAlert.created_at.asc())
+        .all()
+    )
+
+    ignored_stops = []
+    for alert in stop_alerts:
+        # Did a closing order follow within the grace window?
+        closing_side = OrderSide.SELL if alert.signed_qty > 0 else OrderSide.BUY
+        window_end = alert.created_at + timedelta(minutes=STOP_ACTION_GRACE_MINUTES)
+        acted = any(
+            o.ticker == alert.ticker
+            and o.side == closing_side
+            and alert.created_at <= o.created_at <= window_end
+            for o in orders
+        )
+        if not acted:
+            ignored_stops.append({
+                "ticker": alert.ticker,
+                "level_price": round(alert.level_price, 2),
+                "trigger_price": round(alert.trigger_price, 2),
+                "acknowledged": bool(alert.acknowledged),
+                "still_open": not alert.resolved,
+            })
+
+    if ignored_stops:
+        seen_count = sum(1 for s in ignored_stops if s["acknowledged"])
+        findings.append({
+            "flag": "ignored_own_stop",
+            "label": "Stop hit but not acted on",
+            "count": len(ignored_stops),
+            "detail": (
+                f"{len(ignored_stops)} position(s) breached the stop you set and were not "
+                f"closed within {STOP_ACTION_GRACE_MINUTES} minutes"
+                + (f" ({seen_count} after you had seen the alert)" if seen_count else "")
+                + ". A stop you talk yourself out of is not a stop."
+            ),
+            "examples": ignored_stops[:3],
+        })
+
     # --- Journaling discipline: are trades actually being reflected on? ---
     filled_orders = [o for o in orders if o.status == OrderStatus.FILLED]
     journaled_order_ids = {e.order_id for e in entries if e.order_id}
@@ -284,8 +497,8 @@ def generate_insights(db: Session, account_id: str) -> Dict[str, Any]:
         try:
             findings_text = "\n".join(f"- {f['label']}: {f['detail']}" for f in stats["findings"]) or "- None detected"
             response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=512,
+                model=GENAI_MODEL,
+                max_tokens=capped_max_tokens(512),
                 messages=[{
                     "role": "user",
                     "content": f"""You are a trading performance coach reviewing a paper-trading student's journal.
@@ -298,14 +511,26 @@ Self-reported emotion tags: {stats['tag_counts'] or 'none'}
 Detected behavioural patterns (computed from their real order history):
 {findings_text}
 
-Write 3-4 sentences of direct, actionable coaching. Reference the specific patterns above.
-Be constructive and concrete about what to change next session — no generic platitudes,
-no disclaimers, no restating the numbers back verbatim.""",
+Write 3-4 sentences of direct coaching about their PROCESS AND HABITS.
+
+Hard rules:
+- NEVER give market or timing advice. Do not say when to buy, sell, hold, exit, or wait
+  for a pullback, and never predict what any price will do. You are coaching how they
+  decide, not what to trade.
+- Every claim must trace to a pattern listed above. Cite its actual number or ticker.
+- Prescribe a habit they control before the trade — writing the exit down in advance,
+  capping orders per day, sizing rules — not a market action.
+- No platitudes, no disclaimers, no restating the stats verbatim.
+
+Example of the register wanted: "You closed a winner short of a target you had already
+written down — that is a rule you set and then overrode, so next session decide the exit
+before entry and treat it as fixed."
+""",
                 }],
             )
             narrative = response.content[0].text if response.content else ""
             if narrative:
-                return {**stats, "narrative": narrative, "generated_by": "claude"}
+                return {**stats, "narrative": narrative, "generated_by": provider_label()}
         except Exception as e:
             print(f"Claude journal insights failed: {e}")
             # Fall through to deterministic narrative
@@ -379,8 +604,8 @@ def generate_entry_feedback(db: Session, entry: JournalEntry, regenerate: bool =
     if client:
         try:
             response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=384,
+                model=GENAI_MODEL,
+                max_tokens=capped_max_tokens(384),
                 messages=[{
                     "role": "user",
                     "content": f"""You are a trading performance coach responding to one journal entry.
@@ -398,7 +623,7 @@ habit to counter it next time. Be direct and supportive; no disclaimers.""",
             text = response.content[0].text if response.content else ""
             if text:
                 feedback = text
-                generated_by = "claude"
+                generated_by = provider_label()
         except Exception as e:
             print(f"Claude journal entry feedback failed: {e}")
             # Fall through to deterministic feedback
@@ -449,3 +674,372 @@ habit to counter it next time. Be direct and supportive; no disclaimers.""",
     db.refresh(entry)
 
     return {"feedback": feedback, "flags": flags, "generated_by": generated_by, "cached": False}
+
+
+def auto_journal_fill(db: Session, order: Order, fill: Fill) -> Optional[JournalEntry]:
+    """
+    Create a blank-rationale journal entry the moment a trade fills.
+
+    Called from order_engine.fill_order inside the caller's transaction, so this stays
+    strictly deterministic — no AI, no network. The trader is prompted to add their
+    reasoning afterwards, and the AI reflection is generated on demand via /analyze.
+
+    Never raises: a journaling problem must not be able to break order execution.
+    """
+    try:
+        # Idempotency — there is no unique constraint on order_id, so guard here.
+        existing = (
+            db.query(JournalEntry)
+            .filter(JournalEntry.order_id == order.id)
+            .first()
+        )
+        if existing:
+            return existing
+
+        entry = JournalEntry(
+            id=str(uuid.uuid4()),
+            account_id=order.account_id,
+            order_id=order.id,
+            ticker=order.ticker,
+            entry_type="trade_note",
+            # Empty rather than NULL: pre-existing databases still have NOT NULL on this
+            # column (SQLite cannot drop that without a table rebuild). Both are treated
+            # as "needs annotation" everywhere downstream.
+            rationale="",
+            is_auto=True,
+        )
+        db.add(entry)
+        # No commit — fill_order runs inside the caller's transaction and it commits.
+        return entry
+    except Exception as e:  # pragma: no cover - defensive
+        print(f"Auto-journal failed for order {getattr(order, 'id', '?')}: {e}")
+        return None
+
+
+def _deterministic_decision_text(scores: Dict[str, Any]) -> str:
+    """Plain-language summary of a decision score, used when no AI is configured."""
+    risk = scores.get("risk_score", 0)
+    quality = scores.get("decision_quality_score", 0)
+
+    # Lead with whatever is most out of line: the weakest process factor and the biggest risk.
+    quality_factors = sorted(scores.get("quality_factors", []), key=lambda f: f["score"])
+    risk_factors = sorted(scores.get("risk_factors", []), key=lambda f: -f["score"])
+
+    bits = [f"Risk {risk:.0f}/100, decision quality {quality:.0f}/100 (grade {scores.get('grade', '?')})."]
+    if quality_factors:
+        bits.append(quality_factors[0]["note"])
+    if risk_factors:
+        bits.append(risk_factors[0]["note"])
+    return " ".join(bits)
+
+
+def explain_decision(scores: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Turn a deterministic score breakdown into short coaching prose.
+
+    The model never decides anything — it is handed the already-computed factors and asked
+    to explain them. Falls back to deterministic text whenever AI is unavailable.
+    """
+    client = _get_claude_client()
+
+    if client:
+        try:
+            ctx = scores.get("context", {})
+            risk_lines = "\n".join(
+                f"- {f['label']}: {f['score']:.0f}/100 — {f['note']}"
+                for f in scores.get("risk_factors", [])
+            )
+            quality_lines = "\n".join(
+                f"- {f['label']}: {f['score']:.0f}/100 — {f['note']}"
+                for f in scores.get("quality_factors", [])
+            )
+            response = client.messages.create(
+                model=GENAI_MODEL,
+                max_tokens=capped_max_tokens(384),
+                messages=[{
+                    "role": "user",
+                    "content": f"""You are a trading discipline coach. A trader is about to place this order:
+
+{ctx.get('side', '?').upper()} {ctx.get('qty')} {ctx.get('ticker')} around ${ctx.get('entry_price') or 0:.2f}
+Target: {ctx.get('target_price') or 'not set'}   Stop: {ctx.get('stop_loss') or 'not set'}
+
+A deterministic engine scored the DECISION (not the stock):
+Risk {scores.get('risk_score')}/100 (higher = more risk taken on)
+Decision quality {scores.get('decision_quality_score')}/100 (higher = better process)
+
+Risk factors:
+{risk_lines}
+
+Process factors:
+{quality_lines}
+
+Write 2-3 sentences of direct coaching about the QUALITY OF THIS DECISION.
+Rules:
+- Never say whether to buy or sell, and never predict the price.
+- Reference the specific weakest factors above.
+- Speak to the trader as "you". No preamble, no bullet points.""",
+                }],
+            )
+            text = response.content[0].text if response.content else ""
+            if text and text.strip():
+                return {"explanation": text.strip(), "generated_by": provider_label()}
+        except Exception as e:
+            print(f"Decision explanation failed: {e}")
+            # Fall through to deterministic text
+
+    try:
+        return {
+            "explanation": _deterministic_decision_text(scores),
+            "generated_by": "deterministic",
+        }
+    except Exception:
+        return {"explanation": None, "error": "Explanation failed", "generated_by": "error"}
+
+
+# --------------------------------------------------------------------- news thesis review
+
+# How far the price must move before we call it a real move rather than noise.
+NEWS_MOVE_FLAT_PCT = 0.5
+# Another headline only counts as "missed" if it is materially about the ticker.
+MISSED_RELEVANCE_FLOOR = 0.3
+
+
+def _label_direction(label: Optional[str]) -> int:
+    """Bearish/Bullish label -> -1 / 0 / +1."""
+    return {
+        "Bearish": -1, "Somewhat-Bearish": -1,
+        "Neutral": 0,
+        "Somewhat-Bullish": 1, "Bullish": 1,
+    }.get(label or "", 0)
+
+
+def _session_close(db: Session, ticker: str, day: datetime) -> Optional[float]:
+    """
+    Closing price for a ticker on one session.
+
+    Prefers the last minute bar of the day, because the minute dataset spans the whole news
+    window (2026-06-30 to 2026-08-29) while the daily dataset stops at 2026-07-10. Falls
+    back to the daily bar for dates only the daily set covers.
+    """
+    day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+
+    last_minute = (
+        db.query(PriceHistoryMinute)
+        .filter(
+            PriceHistoryMinute.ticker == ticker,
+            PriceHistoryMinute.timestamp >= day_start,
+            PriceHistoryMinute.timestamp < day_end,
+        )
+        .order_by(PriceHistoryMinute.timestamp.desc())
+        .first()
+    )
+    if last_minute:
+        return last_minute.close
+
+    daily = (
+        db.query(PriceHistoryDaily)
+        .filter(PriceHistoryDaily.ticker == ticker, PriceHistoryDaily.date == day_start)
+        .first()
+    )
+    return daily.close if daily else None
+
+
+def _next_session_close(db: Session, ticker: str, after: datetime, max_lookahead_days: int = 5):
+    """
+    Close of the next session that actually has data, and its date.
+
+    Walks forward a few days so a weekend or gap in the feed does not read as "no data".
+    """
+    day_start = after.replace(hour=0, minute=0, second=0, microsecond=0)
+    for offset in range(1, max_lookahead_days + 1):
+        candidate = day_start + timedelta(days=offset)
+        close = _session_close(db, ticker, candidate)
+        if close is not None:
+            return close, candidate
+    return None, None
+
+
+def review_news_thesis(db: Session, entry: JournalEntry) -> Optional[Dict[str, Any]]:
+    """
+    Did the headline this entry cites actually move the price - and what else was published
+    that day that the trader ignored?
+
+    Fully deterministic. Compares the cited story's sentiment direction against the ticker's
+    realised move from the news date to the next session, then looks for same-day stories on
+    the same ticker that were *more* relevant or pointed the other way.
+
+    Returns None when the entry cites no headline.
+    """
+    article = entry.news_article
+    if article is None:
+        return None
+
+    ticker = article.ticker
+    news_date = article.date
+
+    # Realised move: this session's close -> the next session that has data.
+    base_close = _session_close(db, ticker, news_date)
+    next_close, next_date = _next_session_close(db, ticker, news_date)
+
+    move_pct = None
+    if base_close and next_close:
+        move_pct = ((next_close - base_close) / base_close) * 100.0
+
+    expected = _label_direction(article.sentiment_label)
+
+    if move_pct is None:
+        verdict = "unknown"
+        verdict_text = "No next-session price data to judge this against yet."
+    elif abs(move_pct) < NEWS_MOVE_FLAT_PCT:
+        verdict = "flat"
+        verdict_text = (
+            f"{ticker} barely moved ({move_pct:+.2f}%) - this story did not drive the price "
+            "either way."
+        )
+    else:
+        actual = 1 if move_pct > 0 else -1
+        if expected == 0:
+            verdict = "no_signal"
+            verdict_text = (
+                f"The story was scored Neutral, yet {ticker} moved {move_pct:+.2f}%. "
+                "Something other than this headline drove the price."
+            )
+        elif actual == expected:
+            verdict = "confirmed"
+            verdict_text = (
+                f"The {article.sentiment_label} read was borne out - {ticker} moved "
+                f"{move_pct:+.2f}% into the next session."
+            )
+        else:
+            verdict = "contradicted"
+            verdict_text = (
+                f"The story read {article.sentiment_label}, but {ticker} moved "
+                f"{move_pct:+.2f}% - the price went the other way."
+            )
+
+    # What else was published on that ticker that day, ranked by relevance.
+    same_day = (
+        db.query(NewsArticle)
+        .filter(
+            NewsArticle.ticker == ticker,
+            NewsArticle.date == news_date,
+            NewsArticle.id != article.id,
+        )
+        .order_by(NewsArticle.relevance_score.desc())
+        .all()
+    )
+
+    missed = []
+    for other in same_day:
+        if other.relevance_score < MISSED_RELEVANCE_FLOOR:
+            continue
+        other_dir = _label_direction(other.sentiment_label)
+        # Worth flagging if it contradicted the cited story, or was simply a bigger story.
+        contradicts = other_dir != 0 and expected != 0 and other_dir != expected
+        more_relevant = other.relevance_score > article.relevance_score
+        if contradicts or more_relevant:
+            missed.append({
+                "title": other.title,
+                "sentiment_label": other.sentiment_label,
+                "relevance_score": round(other.relevance_score, 2),
+                "why": "points the other way" if contradicts else "was a bigger story for this ticker",
+            })
+
+    tunnel_vision = any(m["why"] == "points the other way" for m in missed[:3])
+
+    return {
+        "article": {
+            "id": article.id,
+            "ticker": ticker,
+            "title": article.title,
+            "date": news_date.strftime("%Y-%m-%d") if news_date else None,
+            "sentiment_label": article.sentiment_label,
+            "relevance_score": round(article.relevance_score, 2),
+        },
+        "expected_direction": expected,
+        "actual_move_pct": round(move_pct, 2) if move_pct is not None else None,
+        "measured_to": next_date.strftime("%Y-%m-%d") if next_date else None,
+        "verdict": verdict,
+        "verdict_text": verdict_text,
+        "same_day_article_count": len(same_day),
+        "missed": missed[:3],
+        "tunnel_vision": tunnel_vision,
+        "lesson": (
+            "You anchored on one story while the day's coverage disagreed - scan the whole "
+            "tape for a ticker before sizing a view."
+            if tunnel_vision else
+            "Keep pairing each trade with the specific story behind it; that is what makes "
+            "this reviewable at all."
+        ),
+    }
+
+
+def explain_news_thesis(db: Session, entry: JournalEntry) -> Dict[str, Any]:
+    """
+    Coach the trader on their news thesis.
+
+    The verdict and the "what you missed" list are computed deterministically by
+    review_news_thesis; GenAI only turns them into feedback. Never raises.
+    """
+    review = review_news_thesis(db, entry)
+    if review is None:
+        return {"review": None, "coaching": None, "generated_by": "deterministic"}
+
+    client = _get_claude_client()
+    if client:
+        try:
+            missed_lines = [
+                "- [{label}, relevance {rel}] {title} ({why})".format(
+                    label=m["sentiment_label"], rel=m["relevance_score"],
+                    title=m["title"], why=m["why"],
+                )
+                for m in review["missed"]
+            ]
+            missed_text = "\n".join(missed_lines) or "- nothing materially contradictory"
+
+            prompt = (
+                "You are a trading coach reviewing whether a trader read the news correctly.\n\n"
+                "They traded {ticker} citing this story:\n"
+                '"{title}"\n'
+                "Scored: {label} (relevance {rel})\n\n"
+                "WHAT ACTUALLY HAPPENED (computed, not opinion):\n{verdict}\n\n"
+                "OTHER {ticker} STORIES THAT SAME DAY THEY DID NOT CITE:\n{missed}\n\n"
+                "Write 2-3 sentences of coaching about their NEWS READING PROCESS.\n"
+                "Rules:\n"
+                "- Never say whether to buy or sell, and never predict future prices.\n"
+                "- If the price contradicted their read, say so plainly and without sarcasm.\n"
+                "- If they ignored a bigger or opposing story, name it.\n"
+                "- End with one concrete habit for tomorrow.\n"
+                '- Address them as "you". No preamble.'
+            ).format(
+                ticker=review["article"]["ticker"],
+                title=review["article"]["title"],
+                label=review["article"]["sentiment_label"],
+                rel=review["article"]["relevance_score"],
+                verdict=review["verdict_text"],
+                missed=missed_text,
+            )
+
+            response = client.messages.create(
+                model=GENAI_MODEL,
+                max_tokens=capped_max_tokens(384),
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text if response.content else ""
+            if text and text.strip():
+                return {"review": review, "coaching": text.strip(), "generated_by": provider_label()}
+        except Exception as e:
+            print("News thesis coaching failed: {}".format(e))
+
+    # Deterministic coaching: the verdict plus the strongest thing they missed.
+    bits = [review["verdict_text"]]
+    if review["missed"]:
+        top = review["missed"][0]
+        bits.append(
+            'You did not mention "{title}" ({label}), which {why}.'.format(
+                title=top["title"][:90], label=top["sentiment_label"], why=top["why"],
+            )
+        )
+    bits.append(review["lesson"])
+    return {"review": review, "coaching": " ".join(bits), "generated_by": "deterministic"}

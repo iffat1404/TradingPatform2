@@ -652,6 +652,28 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 pip install -r requirements.txt
 ```
 
+### 2b. Configure GenAI (optional)
+
+AI features (journal coaching, portfolio summaries, order parsing, ticker explanations)
+route through the **Echios LiteLLM proxy**, not the public Anthropic API.
+
+```powershell
+Copy-Item .env.example .env    # in backend/
+# then edit .env and set ANTHROPIC_API_KEY=sk-YOURKEY
+python check_genai.py          # verifies the key with one tiny call
+```
+
+| Setting | Default | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | *(empty)* | Empty = deterministic fallbacks only, **zero spend** |
+| `ANTHROPIC_BASE_URL` | `https://llm-2.echios.tech` | The proxy; the key only works here |
+| `GENAI_MODEL` | `nova-micro` | Also `claude-haiku-4-5`, `claude-sonnet-4-6` |
+| `GENAI_MAX_TOKENS` | `1024` | Ceiling per response — lower it to cut spend |
+
+Model names from the public Anthropic API (e.g. `claude-3-5-sonnet-20241022`) **do not
+exist on this proxy** and will fail. Every AI feature degrades gracefully: with no key, or
+on any proxy error, it returns deterministic output instead of erroring (principle 14).
+
 ### 3. Run the API server
 
 ```powershell

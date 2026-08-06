@@ -256,8 +256,14 @@
 /* ---- Backtesting page ---- */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) rather than 1fr: a plain 1fr track cannot shrink below its content's
+     min-content width, so form controls would push the grid wider than its container. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-4);
+}
+
+.form-grid > * {
+  min-width: 0;
 }
 
 @media (max-width: 640px) {
@@ -452,4 +458,97 @@
   .two-col {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* ---- Auto-logged journal entries (Decision Intelligence) ---- */
+.journal-auto-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
+}
+
+/* An unannotated auto entry is an invitation to write, so the whole block is the target. */
+.journal-annotate-prompt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.journal-annotate-prompt:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ---- News-driven journaling ---- */
+.journal-news {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.journal-news-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.journal-news-title {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.journal-news-review {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.journal-news-verdict {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.journal-news-missed ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.journal-news-missed li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.journal-news-missed-title {
+  flex: 1;
+  min-width: 180px;
 }

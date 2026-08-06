@@ -219,6 +219,10 @@ svg {
   color: var(--text);
   font-size: 14px;
   transition: border-color 0.15s var(--ease-out);
+  /* Fill the field rather than falling back to the browser's intrinsic input width
+     (~170px), which overflows narrow containers like the 340px order ticket. */
+  width: 100%;
+  min-width: 0;
 }
 
 .input:focus,

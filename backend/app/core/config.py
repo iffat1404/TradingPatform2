@@ -52,9 +52,32 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "sqlite:///./nomura_stp.db"
-    
+
+    # Which LLM backend to use: "gemini" | "anthropic" | "none".
+    # "none" forces every AI feature onto its deterministic fallback (zero spend).
+    GENAI_PROVIDER: str = "gemini"
+
+    # Google Gemini (direct REST — no extra dependency, uses httpx which is already required)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # GenAI (Echios LiteLLM proxy)
+    # Calls are routed through the training proxy rather than Anthropic directly, so the
+    # base URL must be set and the model must be one the proxy actually serves:
+    #   nova-micro        - Bedrock, ultra-fast, cheapest (default: budget guidance)
+    #   claude-haiku-4-5  - fast, low cost
+    #   claude-sonnet-4-6 - most capable, most expensive
+    # Leave ANTHROPIC_API_KEY empty to run fully on the deterministic fallbacks (no spend).
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_BASE_URL: str = "https://llm-2.echios.tech"
+    GENAI_MODEL: str = "nova-micro"
+    # Ceiling on tokens per response. Each call keeps its own tuned value; this only
+    # clamps them down, so lowering it is a one-knob way to cut spend.
+    GENAI_MAX_TOKENS: int = 1024
+
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()

@@ -102,6 +102,13 @@ class Order(Base):
     type = Column(Enum(OrderType), nullable=False)
     qty = Column(Integer, nullable=False)
     limit_price = Column(Float, nullable=True)  # Null for market orders
+
+    # Trade plan. Recorded for decision scoring and journaling only — NOT enforced:
+    # nothing auto-exits on these levels. Their value is that a trade with a stated
+    # target and stop is a planned trade, which is what the quality score measures.
+    target_price = Column(Float, nullable=True)
+    stop_loss = Column(Float, nullable=True)
+
     status = Column(Enum(OrderStatus), default=OrderStatus.NEW, nullable=False)
     is_backtest = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
@@ -260,16 +267,49 @@ class PriceHistoryMinute(Base):
 
 class NewsSentimentDaily(Base):
     __tablename__ = "news_sentiment_daily"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticker = Column(String, nullable=False, index=True)
     date = Column(DateTime, nullable=False)  # Date component only
     avg_sentiment = Column(Float, nullable=False)  # Average sentiment score for the day
     headline_count = Column(Integer, nullable=False)  # Number of headlines
-    
+
     # Unique constraint
     __table_args__ = (
         UniqueConstraint('ticker', 'date', name='uq_news_sentiment_ticker_date'),
+    )
+
+
+class NewsArticle(Base):
+    """
+    An individual headline as it relates to one ticker.
+
+    The seed loader previously collapsed the news JSON into NewsSentimentDaily's daily
+    average and discarded the headlines, so traders had no way to see *what* the news
+    actually said. This table keeps one row per (article, ticker) pair — the grain the
+    source data is scored at, since a single story can mention several tickers with
+    different relevance and sentiment.
+    """
+    __tablename__ = "news_articles"
+
+    id = Column(String, primary_key=True, index=True)
+    ticker = Column(String, nullable=False, index=True)
+    date = Column(DateTime, nullable=False)          # Trading date (no time component)
+    published_at = Column(DateTime, nullable=False)  # Full publish timestamp
+    title = Column(Text, nullable=False)
+
+    # How much this story is about this ticker, and which way it leans.
+    relevance_score = Column(Float, nullable=False)
+    sentiment_score = Column(Float, nullable=False)
+    sentiment_label = Column(String, nullable=False)  # Bullish .. Bearish
+    topics = Column(String, nullable=True)            # Comma-separated topic names
+
+    __table_args__ = (
+        Index('ix_news_articles_ticker_date', 'ticker', 'date'),
+        Index('ix_news_articles_date', 'date'),
+        # The same story can legitimately appear for several tickers, so uniqueness is on
+        # the pair rather than the title alone.
+        UniqueConstraint('ticker', 'published_at', 'title', name='uq_news_article_ticker_pub_title'),
     )
 
 
@@ -340,8 +380,15 @@ class JournalEntry(Base):
     order_id = Column(String, ForeignKey("orders.id"), nullable=True)  # Null for standalone reflections
     ticker = Column(String, nullable=True)  # Denormalized from the linked order when present
     entry_type = Column(String, nullable=False, default="trade_note")  # trade_note, reflection
-    rationale = Column(Text, nullable=False)
+    # Nullable because auto-logged entries are created at fill time with no rationale yet —
+    # the trader is prompted to annotate them afterwards.
+    rationale = Column(Text, nullable=True)
     emotional_tags = Column(String, nullable=True)  # Comma-separated, e.g. "fomo,anxious"
+    # True when the system created this entry at fill time rather than the trader writing it.
+    is_auto = Column(Boolean, default=False, nullable=False)
+    # The headline the trader says drove this trade. Lets the coach later check whether that
+    # news actually moved the price, and what else was published that they ignored.
+    news_article_id = Column(String, ForeignKey("news_articles.id"), nullable=True)
 
     # Cached output of the last analysis run (regenerated on demand, never automatically)
     ai_feedback = Column(Text, nullable=True)
@@ -355,10 +402,86 @@ class JournalEntry(Base):
     # Relationships
     account = relationship("Account", back_populates="journal_entries")
     order = relationship("Order")
+    news_article = relationship("NewsArticle")
 
     # Index for the common "my entries, newest first" query
     __table_args__ = (
         Index('ix_journal_entries_account_created', 'account_id', 'created_at'),
+    )
+
+
+class TradeDecision(Base):
+    """
+    A snapshot of the Decision Intelligence assessment for one order.
+
+    Scores are computed by deterministic rules in decision_engine; GenAI only narrates
+    them. Advisory only — a poor score never blocks an order. The full factor breakdown
+    and market context are stored as JSON so the UI can show exactly why a score was
+    given, and so historical decisions stay explainable after prices move on.
+    """
+    __tablename__ = "trade_decisions"
+
+    id = Column(String, primary_key=True, index=True)
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    # Null for a preview that was scored but never submitted.
+    order_id = Column(String, ForeignKey("orders.id"), nullable=True, unique=True)
+    ticker = Column(String, nullable=False)
+
+    risk_score = Column(Float, nullable=False)              # 0-100, higher = riskier
+    decision_quality_score = Column(Float, nullable=False)  # 0-100, higher = better process
+    grade = Column(String, nullable=False)                  # A / B / C / D
+
+    factors_json = Column(Text, nullable=False)   # per-factor breakdown, for transparency
+    context_json = Column(Text, nullable=False)   # indicators, volatility, sentiment at entry
+
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    # Relationships
+    account = relationship("Account")
+    order = relationship("Order")
+
+    __table_args__ = (
+        Index('ix_trade_decisions_account_created', 'account_id', 'created_at'),
+    )
+
+
+class LevelAlert(Base):
+    """
+    A target or stop level being reached on an open position.
+
+    Advisory only: the platform never exits for you. The alert exists so the trader is told
+    their own plan has triggered, and so the journal can later ask the more useful question
+    - when your stop hit, did you actually act on it?
+
+    One unresolved alert per (account, ticker, kind) at a time, so a position sitting below
+    its stop does not generate an alert on every poll.
+    """
+    __tablename__ = "level_alerts"
+
+    id = Column(String, primary_key=True, index=True)
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    ticker = Column(String, nullable=False)
+    # The order whose recorded plan produced this level.
+    order_id = Column(String, ForeignKey("orders.id"), nullable=True)
+
+    kind = Column(String, nullable=False)          # "target" | "stop"
+    level_price = Column(Float, nullable=False)    # the level the trader set
+    trigger_price = Column(Float, nullable=False)  # the price that breached it
+    signed_qty = Column(Integer, nullable=False)   # position size when it fired
+
+    acknowledged = Column(Boolean, default=False, nullable=False)
+    acknowledged_at = Column(DateTime, nullable=True)
+    # Set once the position is closed or flipped, so the same level can fire again later.
+    resolved = Column(Boolean, default=False, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    account = relationship("Account")
+    order = relationship("Order")
+
+    __table_args__ = (
+        Index('ix_level_alerts_account_resolved', 'account_id', 'resolved'),
     )
 
 
