@@ -43,7 +43,7 @@ def initialize_market_clock() -> None:
 initialize_market_clock()
 
 app = FastAPI(
-    title="Nomura STP Trading Platform Group 11",
+    title="Shunryū STP Trading Platform Group 11",
     description="Straight-Through-Processing trading simulation platform",
     version="1.0.0"
 )

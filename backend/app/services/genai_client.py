@@ -658,7 +658,7 @@ def explain_order_rejection(
                 max_tokens=capped_max_tokens(256),
                 messages=[{
                     "role": "user",
-                    "content": f"""You explain order rejections on Nomura STP, a paper-trading
+                    "content": f"""You explain order rejections on Shunryū STP, a paper-trading
 simulator used for training. An order was refused by a deterministic pre-trade risk check.
 
 Reason code: {reason_code}

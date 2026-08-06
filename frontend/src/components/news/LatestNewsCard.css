@@ -1,10 +1,20 @@
-.news-list {
+/*
+ * Every rule is scoped under .latest-news on purpose.
+ *
+ * Unscoped, this file collided with NewsFeed.css on .news-list/.news-item/.news-ticker/
+ * .news-time/.news-title — both components render on the Overview page, so whichever
+ * stylesheet the bundler emitted last silently restyled the other. It also redefined the
+ * global .empty-state and .loading-row design-system classes, which leaked to every page
+ * that pulled this chunk in.
+ */
+
+.latest-news {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.news-item {
+.latest-news .news-item {
   padding: 12px;
   border: 1px solid rgba(100, 100, 100, 0.3);
   border-radius: 4px;
@@ -12,11 +22,11 @@
   transition: background-color 0.2s ease;
 }
 
-.news-item:hover {
+.latest-news .news-item:hover {
   background-color: rgba(40, 40, 38, 0.8);
 }
 
-.news-header {
+.latest-news .news-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -24,20 +34,20 @@
   gap: 12px;
 }
 
-.news-ticker {
+.latest-news .news-ticker {
   font-size: 12px;
   font-weight: 600;
   color: #9d9da2;
   letter-spacing: 0.5px;
 }
 
-.sentiment-info {
+.latest-news .sentiment-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.sentiment-badge {
+.latest-news .sentiment-badge {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -45,7 +55,7 @@
   font-weight: 600;
 }
 
-.sentiment-score {
+.latest-news .sentiment-score {
   font-size: 11px;
   font-weight: 700;
   color: #e8e8e8;
@@ -54,16 +64,15 @@
   border-radius: 2px;
 }
 
-.news-title {
-  margin: 0;
+.latest-news .news-title {
+  margin: 0 0 8px;
   font-size: 13px;
   line-height: 1.4;
   color: #e8e8e8;
   font-weight: 500;
-  margin-bottom: 8px;
 }
 
-.news-footer {
+.latest-news .news-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -71,26 +80,10 @@
   color: #6d6a6a;
 }
 
-.news-source {
+.latest-news .news-source {
   font-weight: 500;
 }
 
-.news-time {
+.latest-news .news-time {
   font-style: italic;
 }
-
-.empty-state {
-  padding: 16px;
-  text-align: center;
-  color: #6d6a6a;
-  font-size: 13px;
-}
-
-.loading-row {
-  padding: 16px;
-  text-align: center;
-  color: #6d6a6a;
-  font-size: 13px;
-}
-
-

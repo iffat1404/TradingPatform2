@@ -56,7 +56,7 @@ export function PortfolioPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'Shunryū-stp-portfolio.csv';
+      a.download = 'shunryu-stp-portfolio.csv';
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

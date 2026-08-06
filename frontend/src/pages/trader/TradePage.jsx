@@ -325,24 +325,24 @@ export function TradePage() {
             )}
 
             {/* Order Type Segmented Control */}
-<Field label="Order type">
-  <div className="segmented-control">
-    <button
-      type="button"
-      className={`segment-btn ${form.type === 'market' ? 'active' : ''}`}
-      onClick={() => setForm((f) => ({ ...f, type: 'market' }))}
-    >
-      Market
-    </button>
-    <button
-      type="button"
-      className={`segment-btn ${form.type === 'limit' ? 'active' : ''}`}
-      onClick={() => setForm((f) => ({ ...f, type: 'limit' }))}
-    >
-      Limit
-    </button>
-  </div>
-</Field>
+            <Field label="Order type">
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segment-btn ${form.type === 'market' ? 'active' : ''}`}
+                  onClick={() => setForm((f) => ({ ...f, type: 'market' }))}
+                >
+                  Market
+                </button>
+                <button
+                  type="button"
+                  className={`segment-btn ${form.type === 'limit' ? 'active' : ''}`}
+                  onClick={() => setForm((f) => ({ ...f, type: 'limit' }))}
+                >
+                  Limit
+                </button>
+              </div>
+            </Field>
 
 {/* Quantity Input with Step Controls & Quick Quick-Select Pills */}
 <Field label="Quantity">
@@ -430,8 +430,8 @@ export function TradePage() {
 
             <div className={`order-summary-row ${form.side}`}>
               <span className="cost-label">{executionLabel}</span>
+            </div>
 
-            
             <div className="order-summary-row">
               <span>Estimated cost</span>
               <strong>{formatCurrency(estimatedCost)}</strong>

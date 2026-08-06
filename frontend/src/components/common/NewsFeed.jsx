@@ -29,7 +29,18 @@ const SHORT_LABEL = {
   Bearish: 'Bearish',
 };
 
-export function NewsFeed({ ticker, days = 1, limit = 12, minRelevance = 0.1, compact = false }) {
+export function NewsFeed({
+  ticker,
+  days = 1,
+  limit = 12,
+  minRelevance = 0.1,
+  compact = false,
+  // Ids AND titles already shown by the sentiment snapshot on the same page, so the two
+  // panels never print the same headline twice. Titles matter because one wire story is
+  // filed once per ticker it mentions - same headline, different id - so excluding by id
+  // alone still lets a duplicate through. Over-fetch to backfill what gets filtered out.
+  excludeKeys = [],
+}) {
   const navigate = useNavigate();
   const clock = useMarketClock();
   const [data, setData] = useState(null);
@@ -38,6 +49,9 @@ export function NewsFeed({ ticker, days = 1, limit = 12, minRelevance = 0.1, com
 
   // Re-fetch when the simulated DAY changes (not every clock tick).
   const simDate = clock.simulatedTime ? clock.simulatedTime.slice(0, 10) : null;
+  // Unit separator: headlines routinely contain commas.
+  const SEP = '\u001f';
+  const excludeKey = excludeKeys.map(String).join(SEP);
 
   useEffect(() => {
     let active = true;
@@ -45,7 +59,7 @@ export function NewsFeed({ ticker, days = 1, limit = 12, minRelevance = 0.1, com
     listNews({
       ...(ticker ? { ticker } : {}),
       days,
-      limit,
+      limit: limit + excludeKeys.length,
       min_relevance: minRelevance,
     })
       .then((res) => {
@@ -58,12 +72,17 @@ export function NewsFeed({ ticker, days = 1, limit = 12, minRelevance = 0.1, com
     return () => {
       active = false;
     };
-  }, [ticker, days, limit, minRelevance, simDate]);
+    // excludeKey, not excludeIds: a fresh array literal from the parent would otherwise
+    // change identity every render and re-fetch in a loop.
+  }, [ticker, days, limit, minRelevance, simDate, excludeKey]);
 
   if (loading && !data) return <div className="loading-row">Loading market news…</div>;
   if (failed) return <div className="empty-state">News feed unavailable right now.</div>;
 
-  const articles = data?.articles || [];
+  const excluded = new Set(excludeKey ? excludeKey.split(SEP) : []);
+  const articles = (data?.articles || [])
+    .filter((a) => !excluded.has(String(a.id)) && !excluded.has(a.title))
+    .slice(0, limit);
 
   if (!articles.length) {
     return (

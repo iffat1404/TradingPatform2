@@ -30,6 +30,8 @@ const extractPerformanceSeries = (report, start, current) => {
 };
 
 export function OverviewPage() {
+  // Ids + titles the sentiment snapshot has claimed, so the full feed below can skip them.
+  const [featuredNewsKeys, setFeaturedNewsKeys] = useState([]);
   const { user } = useAuth();
   const [portfolio, setPortfolio] = useState(null);
   const [pnl, setPnl] = useState(null);
@@ -130,7 +132,8 @@ export function OverviewPage() {
 
       <div className="overview-row-2">
         <Card title="Latest news">
-          <LatestNewsCard />
+          {/* setState is identity-stable, so passing it straight in is safe as a dep. */}
+          <LatestNewsCard limit={3} onFeatured={setFeaturedNewsKeys} />
         </Card>
 
         <Card title="Top movers">
@@ -152,7 +155,7 @@ export function OverviewPage() {
             </Link>
           }
         >
-          <NewsFeed days={1} limit={12} minRelevance={0.1} />
+          <NewsFeed days={1} limit={12} minRelevance={0.1} excludeKeys={featuredNewsKeys} />
         </Card>
       </div>
     </div>
