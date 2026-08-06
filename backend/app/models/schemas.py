@@ -153,11 +153,29 @@ class PriceHistoryMinuteResponse(BaseModel):
 # News Sentiment Schema
 class NewsSentimentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     ticker: str
     date: datetime
     avg_sentiment: float
     headline_count: int
+
+
+# Platform Spread Schema
+class PlatformSpreadResponse(BaseModel):
+    """Platform bid/ask quotes with spread metrics."""
+    model_config = ConfigDict(from_attributes=True)
+
+    symbol: str = Field(..., description="Stock ticker symbol")
+    midPrice: float = Field(..., description="Mid price between bid and ask")
+    bid: float = Field(..., description="Platform bid quote")
+    ask: float = Field(..., description="Platform ask quote")
+    spread: float = Field(..., description="Absolute spread (ask - bid)")
+    spreadPercentage: float = Field(..., description="Spread as percentage of ask price")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    rawBid: Optional[float] = Field(None, description="Raw market bid for reference")
+    rawAsk: Optional[float] = Field(None, description="Raw market ask for reference")
+    baseSpreadWidth: Optional[float] = Field(None, description="Base spread before markup")
+    volatilityMultiplier: Optional[float] = Field(None, description="Applied volatility multiplier")
 
 
 # Portfolio Schemas

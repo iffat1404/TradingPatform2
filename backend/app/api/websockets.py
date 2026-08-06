@@ -10,6 +10,7 @@ from app.models.orm import Account
 from app.services.feed_simulator import get_current_tick_for_ticker, get_all_current_ticks
 from app.services.portfolio_engine import calculate_portfolio_metrics, get_latest_market_prices
 from app.services.market_clock import get_market_clock
+from app.services.atr_spread_calculator import calculate_atr_spreads
 
 router = APIRouter()
 
@@ -56,6 +57,18 @@ async def market_websocket(websocket: WebSocket, ticker: str):
                 )
 
                 if current_tick:
+                    # Calculate ATR-based spreads using OHLCV data
+                    try:
+                        spreads = calculate_atr_spreads(
+                            symbol=ticker,
+                            close=current_tick.get("close", 0.0),
+                            high=current_tick.get("high", 0.0),
+                            low=current_tick.get("low", 0.0)
+                        )
+                    except Exception as e:
+                        print(f"Error calculating spreads for {ticker}: {e}")
+                        spreads = None
+
                     payload = {
                         "type": "tick",
                         "timestamp": simulated_now.isoformat(),
@@ -66,8 +79,22 @@ async def market_websocket(websocket: WebSocket, ticker: str):
                         "low": current_tick.get("low", 0.0),
                         "volume": current_tick.get("volume", 0),
                         "change": 0.0,
-                        "change_percent": 0.0
+                        "change_percent": 0.0,
                     }
+
+                    # Add ATR-based spread data if available
+                    if spreads:
+                        payload["spread"] = {
+                            "symbol": spreads["symbol"],
+                            "bid": spreads["bid"],
+                            "ask": spreads["ask"],
+                            "spread": spreads["spread"],
+                            "spreadPercentage": spreads["spreadPercentage"],
+                            "atr14": spreads["atr14"],
+                            "volatilityMultiplier": spreads["volatilityMultiplier"],
+                            "timestamp": spreads["timestamp"],
+                            "isWarmUp": spreads["isWarmUp"]
+                        }
                     try:
                         await websocket.send_json(payload)
                         last_broadcast_minute = current_minute
@@ -116,13 +143,38 @@ async def all_markets_websocket(websocket: WebSocket):
                 tickers_payload: Dict[str, Any] = {}
                 if all_ticks:
                     for symbol, tick in all_ticks.items():
-                        tickers_payload[symbol] = {
+                        # Calculate ATR-based spreads for each symbol
+                        try:
+                            spreads = calculate_atr_spreads(
+                                symbol=symbol,
+                                close=tick.get("close", 0.0),
+                                high=tick.get("high", 0.0),
+                                low=tick.get("low", 0.0)
+                            )
+                        except Exception as e:
+                            print(f"Error calculating spreads for {symbol}: {e}")
+                            spreads = None
+
+                        ticker_data = {
                             "price": tick.get("close", 0.0),
                             "open": tick.get("open", 0.0),
                             "high": tick.get("high", 0.0),
                             "low": tick.get("low", 0.0),
-                            "volume": tick.get("volume", 0)
+                            "volume": tick.get("volume", 0),
                         }
+
+                        if spreads:
+                            ticker_data["spread"] = {
+                                "bid": spreads["bid"],
+                                "ask": spreads["ask"],
+                                "spread": spreads["spread"],
+                                "spreadPercentage": spreads["spreadPercentage"],
+                                "atr14": spreads["atr14"],
+                                "volatilityMultiplier": spreads["volatilityMultiplier"],
+                                "isWarmUp": spreads["isWarmUp"]
+                            }
+
+                        tickers_payload[symbol] = ticker_data
 
                 payload = {
                     "type": "market_snapshot",
