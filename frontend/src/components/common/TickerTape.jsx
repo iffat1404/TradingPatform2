@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getMarketCurrent, TICKERS } from '../../api/prices';
 import { useMarketClock } from '../../hooks/useMarketClock';
-import { formatCurrency, formatPercent, deltaClass } from '../../utils/format';
+import { formatCurrency, formatPercent, deltaClass, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import './TickerTape.css';
 
 export function TickerTape() {
@@ -50,9 +50,11 @@ export function TickerTape() {
   }
 
   const items = rows.map(({ ticker, row }) => {
-    const change = row.close - row.open;
-    const changePct = row.open ? (change / row.open) * 100 : 0;
-    return { ticker, price: row.close, changePct };
+    // Standard ticker change % against previous close
+    const changePct = calculateTickerChange(row.close, row.previous_close || row.open);
+    // Intraday change (current price - today's open)
+    const intradayChange = calculateIntradayChange(row.close, row.open);
+    return { ticker, price: row.close, changePct, intradayChange };
   });
 
   const renderItems = (keyPrefix) =>
@@ -62,6 +64,9 @@ export function TickerTape() {
         <span className="mono-num ticker-price">{formatCurrency(item.price)}</span>
         <span className={`mono-num ticker-change ${deltaClass(item.changePct)}`}>
           {item.changePct >= 0 ? '▲' : '▼'} {formatPercent(item.changePct)}
+        </span>
+        <span className={`mono-num ticker-intraday ${deltaClass(item.intradayChange)}`}>
+          {item.intradayChange >= 0 ? '+' : ''}{formatCurrency(item.intradayChange)}
         </span>
       </span>
     ));

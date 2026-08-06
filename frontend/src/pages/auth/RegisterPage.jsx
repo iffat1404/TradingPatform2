@@ -50,7 +50,7 @@ export function RegisterPage() {
       <aside className="auth-side">
         <div className="auth-side-top landing-brand">
           <span className="auth-side-mark">N</span>
-          <span className="font-mono landing-brand-name">NOMURA STP</span>
+          <span className="font-mono landing-brand-name">SHUNRYŪ STP</span>
         </div>
         <p className="auth-side-quote">
           $1,000,000 in virtual capital. Seven live instruments. Zero real risk — every rule

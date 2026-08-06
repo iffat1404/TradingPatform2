@@ -11,10 +11,10 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Field } from '../../components/common/Field';
 import { ProcessRail } from '../../components/common/ProcessRail';
-import { PriceChart } from '../../components/charts/PriceChart';
+import { KlineChart } from '../../components/charts/KlineChart';
 import { DecisionPanel } from '../../components/common/DecisionPanel';
 import { toDailyPoints, toIntradayPoints, filterToSimulatedDay } from '../../utils/chartData';
-import { formatCurrency, formatDateTime, deltaClass, orderQty } from '../../utils/format';
+import { formatCurrency, formatDateTime, formatPercent, deltaClass, orderQty, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import { previewDecision } from '../../api/decision';
 import { extractErrorMessage } from '../../api/client';
 import './trader-pages.css';
@@ -192,6 +192,16 @@ export function TradePage() {
               {ticker}
             </span>
             <span className="price-value mono-num">{formatCurrency(currentPrice)}</span>
+            {latest && (
+              <div className="price-metrics">
+                <span className={`mono-num ${deltaClass(calculateTickerChange(currentPrice, latest.previous_close || latest.open))}`}>
+                  {calculateTickerChange(currentPrice, latest.previous_close || latest.open) >= 0 ? '▲' : '▼'} {formatPercent(calculateTickerChange(currentPrice, latest.previous_close || latest.open))}
+                </span>
+                <span className={`mono-num price-intraday ${deltaClass(calculateIntradayChange(currentPrice, latest.open))}`}>
+                  {calculateIntradayChange(currentPrice, latest.open) >= 0 ? '+' : ''}{formatCurrency(calculateIntradayChange(currentPrice, latest.open))}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="chart-range-tabs">
@@ -229,7 +239,7 @@ export function TradePage() {
             </p>
           )}
 
-          <PriceChart data={chartPoints} height={360} />
+          <KlineChart data={chartPoints} height={400} ticker={ticker} isIntraday={chartMode === 'intraday'} />
         </Card>
 
         <Card title="Order ticket" className="order-ticket-card">

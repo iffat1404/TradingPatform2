@@ -10,6 +10,22 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  margin-left: 232px;
+  transition: margin-left 0.3s ease;
+}
+
+.dashboard-shell.sidebar-collapsed .dashboard-main {
+  margin-left: 76px;
+}
+
+.dashboard-shell.sidebar-collapsed.sidebar-hovered .dashboard-main {
+  margin-left: 232px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-main {
+    margin-left: 76px;
+  }
 }
 
 .dashboard-content {

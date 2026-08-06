@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/common/Sidebar';
 import { Topbar } from '../components/common/Topbar';
@@ -27,10 +28,23 @@ export function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const title = TITLES[location.pathname] || 'Admin Console';
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
 
   return (
-    <div className="theme-dark role-admin dashboard-shell">
-      <Sidebar items={NAV_ITEMS} roleLabel="Admin Console" onLogout={logout} />
+    <div className={`theme-dark role-admin dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isSidebarCollapsed && isSidebarHovered ? 'sidebar-hovered' : ''}`}>
+      <Sidebar 
+        items={NAV_ITEMS} 
+        roleLabel="Admin Console" 
+        onLogout={logout}
+        isCollapsed={isSidebarCollapsed}
+        onToggle={toggleSidebar}
+        onHoverChange={setIsSidebarHovered}
+      />
       <div className="dashboard-main">
         <Topbar title={title} user={user} />
         <div className="dashboard-content">

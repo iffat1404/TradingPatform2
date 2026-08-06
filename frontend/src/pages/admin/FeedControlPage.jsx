@@ -137,13 +137,6 @@ export function FeedControlPage() {
         </Card>
       </div>
 
-      {feedStatus ? (
-        <Card title="Feed status (raw)">
-          <pre className="ai-output" style={{ margin: 0 }}>
-            {JSON.stringify(feedStatus, null, 2)}
-          </pre>
-        </Card>
-      ) : null}
     </div>
   );
 }
