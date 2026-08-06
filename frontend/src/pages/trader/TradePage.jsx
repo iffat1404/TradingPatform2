@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { TICKERS, getDaily, getIntraday, getLatestPrice } from '../../api/prices';
+import { TICKERS, getDaily, getIntraday, getLatestPrice, getPlatformQuotes } from '../../api/prices';
 import { createOrder, listOrders, cancelOrder } from '../../api/orders';
 import { getPortfolioSummary } from '../../api/portfolio';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +37,7 @@ export function TradePage() {
   const [latest, setLatest] = useState(null);
   const [orders, setOrders] = useState([]);
   const [buyingPower, setBuyingPower] = useState(null);
+  const [quotes, setQuotes] = useState(null);
   const [form, setForm] = useState({
     side: prefill?.side === 'sell' ? 'sell' : 'buy',
     type: prefill?.type === 'limit' ? 'limit' : 'market',
@@ -50,6 +51,8 @@ export function TradePage() {
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [decisionError, setDecisionError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [lastOrderSide, setLastOrderSide] = useState(null);
+  const [orderSuccess, setOrderSuccess] = useState(false);
   const { tick } = useMarketTicker(ticker);
   const clock = useMarketClock();
 
@@ -68,6 +71,7 @@ export function TradePage() {
   useEffect(() => {
     getDaily(ticker).then((rows) => setDailyData(toDailyPoints(rows))).catch(() => setDailyData([]));
     getLatestPrice(ticker).then(setLatest).catch(() => setLatest(null));
+    getPlatformQuotes(ticker).then(setQuotes).catch(() => setQuotes(null));
   }, [ticker]);
 
   // Live minute-level bars — for the current simulated trading day only.
@@ -100,7 +104,15 @@ export function TradePage() {
 
   const currentPrice = tick?.price ?? latest?.close ?? 0;
   const estimatedPrice = form.type === 'limit' && form.limitPrice ? Number(form.limitPrice) : currentPrice;
-  const estimatedCost = estimatedPrice * (Number(form.qty) || 0);
+
+  // Use bid/ask from real-time spreads for execution
+  const executionPrice = form.side === 'buy'
+    ? (tick?.spread?.ask ?? estimatedPrice)
+    : (tick?.spread?.bid ?? estimatedPrice);
+
+  // Dynamic estimated cost based on side and execution price
+  const estimatedCost = executionPrice * (Number(form.qty) || 0);
+  const executionLabel = form.side === 'buy' ? 'Estimated Cost (BUY at ASK)' : 'Estimated Proceeds (SELL at BID)';
 
   const openOrders = useMemo(() => orders.filter((o) => OPEN_STATUSES.has(o.status)), [orders]);
 
@@ -152,13 +164,17 @@ export function TradePage() {
         side: form.side,
         type: form.type,
         qty: Number(form.qty),
-        limit_price: form.type === 'limit' ? Number(form.limitPrice) : undefined,
+        limit_price: form.type === 'limit' ? Number(form.limitPrice) : executionPrice,
         target_price: form.targetPrice ? Number(form.targetPrice) : undefined,
         stop_loss: form.stopLoss ? Number(form.stopLoss) : undefined,
         time_in_force: form.tif,
       });
-      toast.success(`${form.side === 'buy' ? 'Buy' : 'Sell'} order for ${ticker} submitted.`);
+      setLastOrderSide(form.side);
+      setOrderSuccess(true);
+      toast.success(`${form.side === 'buy' ? 'Buy' : 'Sell'} order for ${ticker} submitted at ${formatCurrency(executionPrice)}.`);
       refreshOrders();
+      // Clear success indicator after 3 seconds
+      setTimeout(() => setOrderSuccess(false), 3000);
     } catch (err) {
       toast.error(extractErrorMessage(err, 'Order was rejected.'));
     } finally {
@@ -202,6 +218,22 @@ export function TradePage() {
                 </span>
               </div>
             )}
+            {tick?.spread && (
+              <div className="spread-pill">
+                <span className="spread-value">
+                  Spread: {formatCurrency(tick.spread.spread)} ({tick.spread.spreadPercentage.toFixed(3)}%)
+                </span>
+                <span className={`volatility-badge vol-${
+                  tick.spread.volatilityMultiplier >= 1.5 ? 'very-high' :
+                  tick.spread.volatilityMultiplier >= 1.2 ? 'high' :
+                  'normal'
+                }`}>
+                  {tick.spread.volatilityMultiplier >= 1.5 ? 'Very High Vol' :
+                   tick.spread.volatilityMultiplier >= 1.2 ? 'High Vol' :
+                   'Normal Vol'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="chart-range-tabs">
@@ -239,7 +271,8 @@ export function TradePage() {
             </p>
           )}
 
-          <KlineChart data={chartPoints} height={400} ticker={ticker} isIntraday={chartMode === 'intraday'} />
+          <KlineChart data={chartPoints} height={500} ticker={ticker} isIntraday={chartMode === 'intraday'} />
+
         </Card>
 
         <Card title="Order ticket" className="order-ticket-card">
@@ -260,41 +293,103 @@ export function TradePage() {
             <div className="side-toggle">
               <button
                 type="button"
-                className={`buy${form.side === 'buy' ? ' is-active' : ''}`}
+                className={`buy${form.side === 'buy' ? ' is-active' : ''}${orderSuccess && lastOrderSide === 'buy' ? ' completed' : ''}`}
                 onClick={() => setForm((f) => ({ ...f, side: 'buy' }))}
               >
-                Buy
+                {orderSuccess && lastOrderSide === 'buy' ? '✓ Buy' : 'Buy'}
               </button>
               <button
                 type="button"
-                className={`sell${form.side === 'sell' ? ' is-active' : ''}`}
+                className={`sell${form.side === 'sell' ? ' is-active' : ''}${orderSuccess && lastOrderSide === 'sell' ? ' completed' : ''}`}
                 onClick={() => setForm((f) => ({ ...f, side: 'sell' }))}
               >
-                Sell
+                {orderSuccess && lastOrderSide === 'sell' ? '✓ Sell' : 'Sell'}
               </button>
             </div>
 
-            <Field label="Order type">
-              <select
-                className="select"
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-              >
-                <option value="market">Market</option>
-                <option value="limit">Limit</option>
-              </select>
-            </Field>
+            {tick?.spread && (
+              <div className="market-depth-box">
+                <div className="depth-cell bid-cell">
+                  <span className="depth-label">BID</span>
+                  <span className="depth-value">{formatCurrency(tick.spread.bid)}</span>
+                </div>
+                <div className="depth-cell spread-cell">
+                  <span className="depth-label">SPREAD</span>
+                  <span className="depth-value">{formatCurrency(tick.spread.spread)}</span>
+                </div>
+                <div className="depth-cell ask-cell">
+                  <span className="depth-label">ASK</span>
+                  <span className="depth-value">{formatCurrency(tick.spread.ask)}</span>
+                </div>
+              </div>
+            )}
 
-            <Field label="Quantity">
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={form.qty}
-                onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
-              />
-            </Field>
+            {/* Order Type Segmented Control */}
+<Field label="Order type">
+  <div className="segmented-control">
+    <button
+      type="button"
+      className={`segment-btn ${form.type === 'market' ? 'active' : ''}`}
+      onClick={() => setForm((f) => ({ ...f, type: 'market' }))}
+    >
+      Market
+    </button>
+    <button
+      type="button"
+      className={`segment-btn ${form.type === 'limit' ? 'active' : ''}`}
+      onClick={() => setForm((f) => ({ ...f, type: 'limit' }))}
+    >
+      Limit
+    </button>
+  </div>
+</Field>
 
+{/* Quantity Input with Step Controls & Quick Quick-Select Pills */}
+<Field label="Quantity">
+  <div className="quantity-wrapper">
+    <div className="quantity-input-group">
+      <button
+        type="button"
+        className="qty-step-btn"
+        onClick={() => setForm((f) => ({ ...f, qty: Math.max(1, (Number(f.qty) || 1) - 1) }))}
+      >
+        −
+      </button>
+      <input
+        className="input quantity-input"
+        type="number"
+        min={1}
+        value={form.qty}
+        onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
+      />
+      <button
+        type="button"
+        className="qty-step-btn"
+        onClick={() => setForm((f) => ({ ...f, qty: (Number(f.qty) || 0) + 1 }))}
+      >
+        +
+      </button>
+    </div>
+
+    {/* Quick Percent Selection (Optional based on max purchasing power) */}
+    <div className="quick-qty-pills">
+      {[0.25, 0.5, 0.75, 1.0].map((pct) => (
+        <button
+          key={pct}
+          type="button"
+          className="qty-pill"
+          onClick={() => {
+            // Calculates quantity based on max available units (e.g., maxShares = 100)
+            const maxShares = 100; 
+            setForm((f) => ({ ...f, qty: Math.max(1, Math.floor(maxShares * pct)) }));
+          }}
+        >
+          {pct === 1.0 ? 'MAX' : `${pct * 100}%`}
+        </button>
+      ))}
+    </div>
+  </div>
+</Field>
             {form.type === 'limit' && (
               <Field label="Limit price">
                 <input
@@ -333,19 +428,28 @@ export function TradePage() {
               </Field>
             </div>
 
-            <Field label="Time in force">
-              <select className="select" value={form.tif} onChange={(e) => setForm((f) => ({ ...f, tif: e.target.value }))}>
-                <option value="DAY">Day</option>
-                <option value="GTC">Good till cancelled</option>
-                <option value="IOC">Immediate or cancel</option>
-                <option value="FOK">Fill or kill</option>
-              </select>
-            </Field>
+            <div className={`order-summary-row ${form.side}`}>
+              <span className="cost-label">{executionLabel}</span>
 
+            
             <div className="order-summary-row">
               <span>Estimated cost</span>
               <strong>{formatCurrency(estimatedCost)}</strong>
             </div>
+            {tick?.spread && form.qty && (
+              <div className="order-summary-row">
+                <span>Execution spread cost</span>
+                <strong className="spread-cost">{formatCurrency(tick.spread.spread * Number(form.qty))}</strong>
+              </div>
+            )}
+            {tick?.spread && (
+              <div className="order-summary-row execution-price-row">
+                <span>Execution price ({form.side === 'buy' ? 'ASK' : 'BID'})</span>
+                <strong className={`execution-price ${form.side}`}>
+                  {formatCurrency(executionPrice)}
+                </strong>
+              </div>
+            )}
             <div className="order-summary-row">
               <span>Buying power</span>
               <strong>{formatCurrency(buyingPower)}</strong>

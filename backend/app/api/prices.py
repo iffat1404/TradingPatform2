@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.models.orm import PriceHistoryDaily, PriceHistoryMinute
+from app.models.schemas import PlatformSpreadResponse
 from app.services.feed_simulator import get_current_tick_for_ticker, get_all_current_ticks
+from app.services.spread_calculator import calculate_platform_spreads
 import pandas as pd
 from datetime import datetime, timezone
 
@@ -16,7 +18,7 @@ def get_latest_price(
 ):
     """Get the current minute-level price snapshot for a ticker based on system time."""
     current_tick = get_current_tick_for_ticker(ticker, db)
-    
+
     if not current_tick:
         raise HTTPException(status_code=404, detail=f"No intraday data found for ticker: {ticker}")
 
@@ -30,6 +32,39 @@ def get_latest_price(
         "volume": current_tick["volume"],
         "system_time": datetime.now(timezone.utc).isoformat()
     }
+
+
+@router.get("/{ticker}/quotes", response_model=PlatformSpreadResponse)
+def get_platform_quotes(
+    ticker: str,
+    volatility_multiplier: float = Query(1.0, ge=0.5, le=2.0, description="Volatility adjustment (0.5-2.0)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get platform bid/ask quotes and spread metrics for a ticker.
+
+    Calculates dynamic spreads based on current market data with volatility adjustment.
+    """
+    current_tick = get_current_tick_for_ticker(ticker, db)
+
+    if not current_tick:
+        raise HTTPException(status_code=404, detail=f"No intraday data found for ticker: {ticker}")
+
+    # Derive bid/ask from OHLC data (using close ± 0.05% as market spread)
+    close_price = current_tick["close"]
+    spread_estimate = close_price * 0.0005  # 0.05% market spread estimate
+    raw_bid = close_price - spread_estimate
+    raw_ask = close_price + spread_estimate
+
+    # Calculate platform spreads
+    spreads = calculate_platform_spreads(
+        symbol=ticker.upper(),
+        raw_bid=raw_bid,
+        raw_ask=raw_ask,
+        volatility_multiplier=volatility_multiplier
+    )
+
+    return PlatformSpreadResponse(**spreads)
 
 
 @router.get("/market/current")

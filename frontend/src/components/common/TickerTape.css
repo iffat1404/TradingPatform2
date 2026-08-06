@@ -116,6 +116,12 @@
   font-weight: 600;
 }
 
+.ticker-spread {
+  font-size: 11px;
+  color: #6d6a6a;
+  margin: 0 2px;
+}
+
 .ticker-change {
   font-size: 12px;
 }

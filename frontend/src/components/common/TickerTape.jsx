@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getMarketCurrent, TICKERS } from '../../api/prices';
+import { getMarketCurrent, TICKERS, getPlatformQuotes } from '../../api/prices';
 import { useMarketClock } from '../../hooks/useMarketClock';
 import { formatCurrency, formatPercent, deltaClass, calculateTickerChange, calculateIntradayChange } from '../../utils/format';
 import './TickerTape.css';
 
 export function TickerTape() {
   const [data, setData] = useState(null);
+  const [quotes, setQuotes] = useState({});
   const [failed, setFailed] = useState(false);
   const { marketStatus } = useMarketClock();
 
@@ -29,6 +30,31 @@ export function TickerTape() {
       clearInterval(id);
     };
   }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    let active = true;
+    const fetchQuotes = async () => {
+      const quotesData = {};
+      for (const ticker of TICKERS) {
+        try {
+          const quote = await getPlatformQuotes(ticker);
+          if (active) {
+            quotesData[ticker] = quote;
+          }
+        } catch (err) {
+          // Skip failed quotes
+        }
+      }
+      if (active) {
+        setQuotes(quotesData);
+      }
+    };
+    fetchQuotes();
+    return () => {
+      active = false;
+    };
+  }, [data]);
 
   const rows = TICKERS.map((ticker) => ({ ticker, row: data?.[ticker] })).filter((r) => r.row);
 
@@ -54,14 +80,20 @@ export function TickerTape() {
     const changePct = calculateTickerChange(row.close, row.previous_close || row.open);
     // Intraday change (current price - today's open)
     const intradayChange = calculateIntradayChange(row.close, row.open);
-    return { ticker, price: row.close, changePct, intradayChange };
+    const quote = quotes[ticker];
+    return { ticker, price: row.close, changePct, intradayChange, quote };
   });
 
   const renderItems = (keyPrefix) =>
     items.map((item) => (
-      <span className="ticker-item" key={`${keyPrefix}-${item.ticker}`}>
+      <span className="ticker-item" key={`${keyPrefix}-${item.ticker}`} title={item.quote ? `B: ${formatCurrency(item.quote.bid)} / A: ${formatCurrency(item.quote.ask)}` : ''}>
         <span className="ticker-symbol">{item.ticker}</span>
         <span className="mono-num ticker-price">{formatCurrency(item.price)}</span>
+        {item.quote && (
+          <span className="mono-num ticker-spread" title={`Spread: ${formatCurrency(item.quote.spread)}`}>
+            B: {formatCurrency(item.quote.bid)} / A: {formatCurrency(item.quote.ask)}
+          </span>
+        )}
         <span className={`mono-num ticker-change ${deltaClass(item.changePct)}`}>
           {item.changePct >= 0 ? '▲' : '▼'} {formatPercent(item.changePct)}
         </span>
