@@ -1,0 +1,142 @@
+graph TD
+    subgraph Client["🎨 Frontend Presentation Layer"]
+        Landing["Landing Page<br/>Unauthenticated"]
+        Auth["Auth Module<br/>Login/Register"]
+        Trader["Trader Dashboard<br/>- Overview<br/>- Trade<br/>- Portfolio<br/>- Orders<br/>- Journal<br/>- Analytics<br/>- Backtesting<br/>- AI Assistant"]
+        Admin["Admin Dashboard<br/>- KYC Queue<br/>- Accounts<br/>- Compliance<br/>- Feed Control<br/>- Audit Logs"]
+        UI["🎯 UI Components<br/>- Charts Recharts/KlineChart<br/>- Forms & Modals<br/>- Real-time Ticker<br/>- News Feed<br/>- Level Alerts"]
+    end
+
+    subgraph Auth_Layer["🔐 Auth & CORS Layer"]
+        APIGateway["FastAPI Gateway<br/>CORS Middleware<br/>JWT Token Validation"]
+        AuthSvc["Auth Service<br/>- JWT signing/validation<br/>- Role-based access<br/>- Password hashing"]
+    end
+
+    subgraph API["📡 API Routes & Routers"]
+        Orders["Orders API<br/>POST /orders<br/>GET /orders<br/>PUT /orders/:id"]
+        Portfolio["Portfolio API<br/>GET /portfolio/metrics<br/>GET /portfolio/positions"]
+        Analytics["Analytics API<br/>GET /analytics/performance<br/>POST /analytics/indicators"]
+        Reports["Reports API<br/>GET /reports/:id<br/>POST /reports/generate"]
+        Prices["Prices API<br/>GET /prices/:ticker<br/>GET /prices/history"]
+        PaperTrade["Paper Trading API<br/>POST /paper-trading/trade<br/>GET /paper-trading/metrics"]
+        News["News API<br/>GET /news<br/>POST /news/alerts"]
+        Backtest["Backtest API<br/>POST /backtest/run<br/>GET /backtest/results<br/>GET /backtest/strategies"]
+        GenAI["GenAI/Decision API<br/>POST /genai/analyze<br/>GET /decision/signals<br/>POST /journal/entry"]
+        WebSocketAPI["WebSocket Gateway<br/>ws://market/:ticker<br/>ws://portfolio/:account"]
+    end
+
+    subgraph Services["⚙️ Business Logic Services"]
+        OrderEng["Order Engine<br/>- Validation<br/>- Routing<br/>- Execution<br/>- State tracking"]
+        PortfolioEng["Portfolio Engine<br/>- Position tracking<br/>- PnL calculation<br/>- Cash management<br/>- Risk metrics"]
+        AnalyticsEng["Analytics Engine<br/>- Performance metrics<br/>- Drawdown calc<br/>- Indicator system<br/>- Signal generation"]
+        BacktestEng["Backtest Executor<br/>VectorBT Integration<br/>- Strategy simulation<br/>- Equity curve calc<br/>- Trade log extract<br/>- Sharpe/Drawdown"]
+        BacktestRegistr["Strategy Registry<br/>- Preset strategies<br/>- Parameter validation<br/>- Signal generation"]
+        DecisionEng["Decision Engine<br/>- AI-driven signals<br/>- Sentiment analysis<br/>- Confidence scoring"]
+        JournalEng["Journal Engine<br/>- Trade notes<br/>- Lessons learned<br/>- News correlation"]
+        LevelMonitor["Level Monitor<br/>- Price level alerts<br/>- Breakout detection"]
+        KYCEng["KYC Engine<br/>- Doc validation<br/>- Risk scoring<br/>- Compliance checks"]
+        MarketClock["Market Clock<br/>- Simulated time<br/>- Trading hours<br/>- Session mgmt"]
+    end
+
+    subgraph Feed["📊 Real-Time Feed & Broadcaster"]
+        FeedSim["Feed Simulator<br/>- Historical data replay<br/>- Minute-level ticks<br/>- Timezone handling<br/>- Closest tick lookup"]
+        WSBroadcaster["WebSocket Broadcaster<br/>- Per-ticker channels<br/>- Portfolio updates<br/>- Spread calculation"]
+        ATRCalc["ATR Spread Calculator<br/>- Volatility-based spreads<br/>- Order padding"]
+    end
+
+    subgraph DataLayer["💾 Data & Storage Layer"]
+        SQLite["SQLite Database<br/>WAL Mode<br/>- Accounts<br/>- Orders<br/>- Positions<br/>- KYC records<br/>- Journal entries<br/>- Trade logs"]
+        PriceHist["Price History Tables<br/>- PriceHistoryDaily<br/>- PriceHistoryMinute"]
+        NewsDB["News Feed Storage<br/>- News alerts<br/>- Sentiment tags"]
+        AnalyticsDB["Analytics Cache<br/>- Computed metrics<br/>- Historical indicators"]
+    end
+
+    subgraph External["🌐 External Integrations"]
+        GenAIAPI["GenAI Service<br/>Claude/GPT Integration<br/>- Strategy analysis<br/>- Trade recommendations"]
+        NewsProvider["News Provider<br/>Simulated news data<br/>JSON feed replay"]
+    end
+
+    %% Frontend to Gateway
+    Landing -->|HTTP/REST| APIGateway
+    Auth -->|POST /auth| APIGateway
+    Trader -->|HTTP/REST| APIGateway
+    Admin -->|HTTP/REST| APIGateway
+    UI -->|REST calls via Axios| APIGateway
+
+    %% Gateway to Auth
+    APIGateway -->|Validate| AuthSvc
+    AuthSvc -->|Query/Store| SQLite
+
+    %% Gateway routing to APIs
+    APIGateway -->|Route| Orders
+    APIGateway -->|Route| Portfolio
+    APIGateway -->|Route| Analytics
+    APIGateway -->|Route| Reports
+    APIGateway -->|Route| Prices
+    APIGateway -->|Route| PaperTrade
+    APIGateway -->|Route| News
+    APIGateway -->|Route| Backtest
+    APIGateway -->|Route| GenAI
+    APIGateway -->|Upgrade| WebSocketAPI
+
+    %% API to Services
+    Orders -->|Exec Order| OrderEng
+    Portfolio -->|Fetch Metrics| PortfolioEng
+    Analytics -->|Calc Metrics| AnalyticsEng
+    Backtest -->|Execute| BacktestEng
+    Backtest -->|Load| BacktestRegistr
+    GenAI -->|Analyze| DecisionEng
+    GenAI -->|Track| JournalEng
+    News -->|Monitor| LevelMonitor
+    Prices -->|Get Tick| FeedSim
+
+    %% Services inter-communication
+    OrderEng -->|Update Position| PortfolioEng
+    PortfolioEng -->|Calculate Risk| AnalyticsEng
+    BacktestEng -->|Load Data| PriceHist
+    BacktestRegistr -->|Generate Signals| AnalyticsEng
+    DecisionEng -->|Uses Signals| AnalyticsEng
+    JournalEng -->|Fetch Trade| OrderEng
+    LevelMonitor -->|Check Prices| FeedSim
+    MarketClock -->|Supply Time| FeedSim
+
+    %% Real-time Feed
+    FeedSim -->|Tick Data| WSBroadcaster
+    FeedSim -->|Query| PriceHist
+    WSBroadcaster -->|Calc Spreads| ATRCalc
+    ATRCalc -->|Updated Quotes| WebSocketAPI
+    WebSocketAPI -->|SSE/WSS| Trader
+
+    %% Data Layer
+    Orders -->|CRUD| SQLite
+    Portfolio -->|R/W| SQLite
+    OrderEng -->|Persist| SQLite
+    PortfolioEng -->|Persist| SQLite
+    JournalEng -->|Store| SQLite
+    KYCEng -->|Store| SQLite
+    PriceHist -->|Historical Data| SQLite
+    NewsDB -->|News Data| SQLite
+    AnalyticsDB -->|Cache| SQLite
+
+    %% External
+    GenAI -->|API Call| GenAIAPI
+    News -->|Ingest| NewsProvider
+    NewsProvider -->|Store| NewsDB
+    DecisionEng -->|Fetch| NewsDB
+    LevelMonitor -->|Fetch| NewsDB
+
+    %% Styling
+    classDef frontend fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
+    classDef gateway fill:#10b981,stroke:#065f46,stroke-width:2px,color:#fff
+    classDef service fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff
+    classDef database fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff
+    classDef external fill:#ec4899,stroke:#831843,stroke-width:2px,color:#fff
+    classDef feed fill:#06b6d4,stroke:#0e7490,stroke-width:2px,color:#fff
+
+    class Client,Landing,Auth,Trader,Admin,UI frontend
+    class Auth_Layer,APIGateway,AuthSvc gateway
+    class API,Orders,Portfolio,Analytics,Reports,Prices,PaperTrade,News,Backtest,GenAI,WebSocketAPI gateway
+    class Services,OrderEng,PortfolioEng,AnalyticsEng,BacktestEng,BacktestRegistr,DecisionEng,JournalEng,LevelMonitor,KYCEng,MarketClock service
+    class Feed,FeedSim,WSBroadcaster,ATRCalc feed
+    class DataLayer,SQLite,PriceHist,NewsDB,AnalyticsDB database
+    class External,GenAIAPI,NewsProvider external

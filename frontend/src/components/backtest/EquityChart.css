@@ -1,0 +1,136 @@
+/* EquityChart Styles */
+
+.equity-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+  height: 500px;
+  flex-shrink: 0;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+}
+
+.chart-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem;
+}
+
+.mode-btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  color: #d1d5db;
+}
+
+.mode-btn.active {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.chart-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+.chart-loading,
+.chart-empty {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+/* Recharts Customization */
+
+.recharts-cartesian-axis-tick {
+  fill: #6b7280;
+}
+
+.recharts-cartesian-axis-tick-value {
+  fill: #6b7280;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.recharts-tooltip {
+  outline: none;
+}
+
+.recharts-legend-wrapper {
+  padding-top: 1rem;
+}
+
+.recharts-legend-item-text {
+  color: #9ca3af !important;
+  font-size: 0.85rem;
+}
+
+/* Responsive */
+
+@media (max-width: 1024px) {
+  .equity-chart-container {
+    padding: 0.6rem;
+    height: 400px;
+  }
+
+  .chart-wrapper {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .equity-chart-container {
+    grid-column: 1 / -1;
+    height: 350px;
+  }
+
+  .chart-wrapper {
+    min-height: auto;
+  }
+
+  .chart-title {
+    font-size: 0.9rem;
+  }
+
+  .mode-btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+  }
+}

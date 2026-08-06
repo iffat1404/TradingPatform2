@@ -131,10 +131,6 @@ export function OverviewPage() {
       </div>
 
       <div className="overview-row-2">
-        <Card title="Latest news">
-          {/* setState is identity-stable, so passing it straight in is safe as a dep. */}
-          <LatestNewsCard limit={3} onFeatured={setFeaturedNewsKeys} />
-        </Card>
 
         <Card title="Top movers">
           <ul className="mover-list">

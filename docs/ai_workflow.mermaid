@@ -1,0 +1,176 @@
+graph TD
+    subgraph Trigger["📌 Trigger & Input Payload"]
+        UserAction["User Action<br/>- Place order<br/>- Submit journal entry<br/>- Request AI analysis"]
+        TradeData["Trade Data<br/>POST /decision/preview<br/>DecisionPreviewRequest"]
+        JournalData["Journal Data<br/>POST /journal/entry<br/>JournalCreateRequest"]
+        OrderReject["Order Rejection Event<br/>Order status REJECTED<br/>Reason code stored"]
+    end
+
+    subgraph ContextAgg["🔍 Context Normalization & Aggregation"]
+        FetchPortfolio["Fetch Portfolio State<br/>calculate_portfolio_metrics<br/>- Net worth<br/>- Cash balance<br/>- Position exposure<br/>- Ticker concentration"]
+        FetchTickers["Get Latest Market Prices<br/>get_latest_market_prices<br/>Current quotes per symbol"]
+        FetchIndicators["Fetch Technical Indicators<br/>get_latest_indicators<br/>- RSI 14<br/>- Bollinger Bands<br/>- Moving averages"]
+        FetchVolatility["Calculate Volatility<br/>calculate_atr_percent<br/>14-day ATR vs price"]
+        FetchSentiment["Fetch News Sentiment<br/>get_latest_sentiment<br/>avg_sentiment score<br/>headline_count"]
+        BuildContext["Build Trade Context<br/>build_trade_context<br/>- Side buy/sell<br/>- Qty, price, target, stop<br/>- Notional exposure<br/>- Projected portfolio state"]
+        BehaviorDetect["Detect Trading Patterns<br/>detect_patterns<br/>- Revenge trading<br/>- Overtrading<br/>- Tilt signals<br/>- Plan adherence<br/>- Emotional tags"]
+        JournalHist["Fetch Journal History<br/>Recent entries + emotional tags<br/>Journaling coverage %<br/>Self-reported emotions"]
+    end
+
+    subgraph LLMExec["🧠 Structured Prompting & LLM Execution"]
+        DeterministicScore["Deterministic Scoring<br/>score_trade<br/>- Risk factors 0-100<br/>  concentration,<br/>  diversification,<br/>  technical_stretch,<br/>  volatility,<br/>  sentiment<br/>- Quality factors 0-100<br/>  plan_completeness,<br/>  reward_risk,<br/>  size_discipline,<br/>  signal_alignment,<br/>  journaling_discipline"]
+        ClientSetup["Initialize LLM Client<br/>_get_claude_client<br/>Provider selection<br/>- Gemini 2.0 Flash<br/>- Claude Sonnet/Haiku<br/>- Fallback: none"]
+        PromptConstruct1["Construct Decision Prompt<br/>explain_decision<br/>- Already-computed scores<br/>- Risk/quality factors detail<br/>- Trade context<br/>System: coach tone<br/>Rules: never predict price"]
+        PromptConstruct2["Construct Journal Prompt<br/>generate_entry_feedback<br/>- Entry rationale<br/>- Emotional tags<br/>- Trade PnL outcome<br/>- Detected flags<br/>System: supportive coach"]
+        PromptConstruct3["Construct Insights Prompt<br/>generate_insights<br/>- Behavioral findings<br/>  revenge, overtrading, etc.<br/>- Journal coverage %<br/>- Tag frequency<br/>System: performance coach"]
+        PromptConstruct4["Construct News Thesis Prompt<br/>explain_news_thesis<br/>- Article sentiment vs outcome<br/>- Same-day stories missed<br/>- Tunnel vision detect<br/>System: unbiased analyst"]
+        PromptConstruct5["Construct Portfolio Prompt<br/>generate_portfolio_summary<br/>- Position list<br/>- Total value, cash<br/>System: neutral summary"]
+        PromptConstruct6["Construct Order Rejection Prompt<br/>explain_order_rejection<br/>- Reason code<br/>- Reason detail<br/>- Deterministic reason map<br/>System: supportive coach"]
+        PromptConstruct7["Construct ID Extraction Prompt<br/>extract_id_document_fields<br/>- Base64 image data<br/>- Content-type<br/>System: OCR extractor"]
+        APICall1["LLM API Call<br/>client.messages.create<br/>- model: GENAI_MODEL<br/>- max_tokens: capped<br/>- messages: role + content<br/>- timeout: 45s<br/>POST Anthropic/Gemini"]
+        APICall2["Extract JSON Block<br/>extract_json_block<br/>- Strip markdown fences<br/>- Find balanced braces<br/>- Parse JSON object"]
+    end
+
+    subgraph Validation["✅ Response Validation & Parsing"]
+        Fallback1["Graceful Degradation<br/>On LLM error or timeout<br/>- Catch exceptions<br/>- Log error<br/>- Return deterministic"]
+        TypeCheck["Type Validation<br/>- Check response.content exists<br/>- Verify text block<br/>- Handle empty content"]
+        JSONValidate["JSON Schema Validation<br/>- Try json.loads<br/>- Catch parse error<br/>- Return fallback dict"]
+        DataMap1["Map to Output Schema<br/>Decision: risk_score,<br/>  decision_quality_score,<br/>  grade, factors breakdown,<br/>  context snapshot"]
+        DataMap2["Map to Journal Schema<br/>Entry: feedback,<br/>  ai_flags, ai_generated_by,<br/>  ai_generated_at"]
+        DataMap3["Map to Insights Schema<br/>Insights: narrative,<br/>  findings[], flags[],<br/>  entry_count, etc."]
+        DataMap4["Map to News Schema<br/>Review: verdict,<br/>  verdict_text, missed[],<br/>  tunnel_vision flag"]
+        GenByField["Set generated_by Field<br/>- claude: LLM succeeded<br/>- deterministic: no LLM<br/>- error: exception caught"]
+    end
+
+    subgraph Persistence["💾 Persistence & Storage"]
+        WriteToDB["Write to SQLite<br/>Transaction safety"]
+        WriteDecision["Store TradeDecision<br/>- id, account_id, order_id<br/>- risk_score, quality_score<br/>- grade (A/B/C/D)<br/>- factors_json<br/>- context_json"]
+        WriteJournal["Update JournalEntry<br/>- ai_feedback (text)<br/>- ai_flags (comma-string)<br/>- ai_generated_by<br/>- ai_generated_at"]
+        WriteID["Store ID Extraction<br/>- extracted_full_name<br/>- extracted_dob<br/>- extracted_id_number<br/>- extracted_expiry_date<br/>- extracted_issuing_country<br/>- extraction_confidence"]
+        Commit["COMMIT transaction<br/>On success only"]
+        RollBack["ROLLBACK on error<br/>Preserve data integrity"]
+    end
+
+    subgraph UIFeedback["🎨 UI Feedback & Response"]
+        ResponsePack1["Package Decision Response<br/>POST /decision/preview<br/>- scores (risk/quality)<br/>- factors breakdown<br/>- grade + explanation<br/>- context snapshot"]
+        ResponsePack2["Package Journal Response<br/>GET /journal/:id<br/>- feedback text<br/>- ai_flags list<br/>- generated_by provider"]
+        ResponsePack3["Package Insights Response<br/>GET /journal/insights<br/>- narrative coaching<br/>- findings[] detailed<br/>- patterns flagged"]
+        ResponsePack4["Package News Review<br/>GET /journal/:id/news<br/>- verdict: confirmed/<br/>  contradicted/flat/unknown<br/>- missed articles<br/>- coaching text"]
+        UIRender["Frontend Renders<br/>- Decision panel shows scores<br/>- Journal card shows feedback<br/>- Insights modal with coaching<br/>- News overlay with thesis review"]
+        WebsocketBroadcast["Optional Broadcast<br/>ws://portfolio/:account<br/>Decision score update<br/>Real-time grade change"]
+    end
+
+    %% Trigger to Context
+    UserAction -->|API endpoint| TradeData
+    UserAction -->|API endpoint| JournalData
+    OrderReject -->|Event fired| OrderReject
+
+    %% Context Aggregation Flow
+    TradeData -->|Query| FetchPortfolio
+    TradeData -->|Query| FetchTickers
+    FetchPortfolio -->|Assemble| BuildContext
+    FetchTickers -->|Assemble| BuildContext
+    TradeData -->|Query| FetchIndicators
+    FetchIndicators -->|Assemble| BuildContext
+    TradeData -->|Query| FetchVolatility
+    FetchVolatility -->|Assemble| BuildContext
+    TradeData -->|Query| FetchSentiment
+    FetchSentiment -->|Assemble| BuildContext
+
+    JournalData -->|Query| JournalHist
+    JournalData -->|Query| BehaviorDetect
+    BehaviorDetect -->|Load| JournalHist
+
+    %% LLM Execution Flow
+    BuildContext -->|Context dict| DeterministicScore
+    DeterministicScore -->|Compute| ClientSetup
+    ClientSetup -->|None or valid| PromptConstruct1
+    ClientSetup -->|None or valid| PromptConstruct2
+    ClientSetup -->|None or valid| PromptConstruct3
+    ClientSetup -->|None or valid| PromptConstruct4
+    ClientSetup -->|None or valid| PromptConstruct5
+    ClientSetup -->|None or valid| PromptConstruct6
+    ClientSetup -->|None or valid| PromptConstruct7
+
+    DeterministicScore -->|Factors detail| PromptConstruct1
+    BehaviorDetect -->|Findings| PromptConstruct3
+    JournalHist -->|Entry data| PromptConstruct2
+    JournalHist -->|News thesis| PromptConstruct4
+    FetchPortfolio -->|Portfolio dict| PromptConstruct5
+    OrderReject -->|Reason code| PromptConstruct6
+    TradeData -->|Image data| PromptConstruct7
+
+    PromptConstruct1 -->|JSON prompt| APICall1
+    PromptConstruct2 -->|JSON prompt| APICall1
+    PromptConstruct3 -->|JSON prompt| APICall1
+    PromptConstruct4 -->|JSON prompt| APICall1
+    PromptConstruct5 -->|JSON prompt| APICall1
+    PromptConstruct6 -->|JSON prompt| APICall1
+    PromptConstruct7 -->|JSON prompt| APICall1
+
+    APICall1 -->|HTTP response| APICall2
+    APICall1 -->|Exception| Fallback1
+    APICall2 -->|Extracted text| TypeCheck
+    APICall2 -->|Parse error| Fallback1
+
+    %% Validation Flow
+    TypeCheck -->|content exists?| JSONValidate
+    JSONValidate -->|JSON valid?| DataMap1
+    JSONValidate -->|Parse fails| Fallback1
+    Fallback1 -->|Deterministic output| DataMap1
+    Fallback1 -->|Deterministic output| DataMap2
+    Fallback1 -->|Deterministic output| DataMap3
+    Fallback1 -->|Deterministic output| DataMap4
+
+    DataMap1 -->|Schema mapped| GenByField
+    DataMap2 -->|Schema mapped| GenByField
+    DataMap3 -->|Schema mapped| GenByField
+    DataMap4 -->|Schema mapped| GenByField
+
+    %% Persistence Flow
+    GenByField -->|Result dict| WriteToDB
+    DataMap1 -->|Decision data| WriteDecision
+    DataMap2 -->|Journal data| WriteJournal
+    DataMap4 -->|ID data| WriteID
+    WriteDecision -->|Persist| Commit
+    WriteJournal -->|Persist| Commit
+    WriteID -->|Persist| Commit
+    Fallback1 -->|On error| RollBack
+
+    %% UI Response Flow
+    GenByField -->|Final payload| ResponsePack1
+    GenByField -->|Final payload| ResponsePack2
+    GenByField -->|Final payload| ResponsePack3
+    GenByField -->|Final payload| ResponsePack4
+
+    ResponsePack1 -->|JSON HTTP 200| UIRender
+    ResponsePack2 -->|JSON HTTP 200| UIRender
+    ResponsePack3 -->|JSON HTTP 200| UIRender
+    ResponsePack4 -->|JSON HTTP 200| UIRender
+
+    UIRender -->|Render components| WebsocketBroadcast
+
+    %% Styling
+    classDef trigger fill:#1e3a8a,stroke:#1e40af,stroke-width:2px,color:#fff,font-weight:bold
+    classDef context fill:#1e3a8a,stroke:#1e40af,stroke-width:2px,color:#fff
+    classDef llm fill:#4c1d95,stroke:#5b21b6,stroke-width:2px,color:#fff,font-weight:bold
+    classDef llmstep fill:#4c1d95,stroke:#5b21b6,stroke-width:2px,color:#fff
+    classDef validation fill:#4c1d95,stroke:#5b21b6,stroke-width:2px,color:#fff
+    classDef storage fill:#78350f,stroke:#b45309,stroke-width:2px,color:#fff,font-weight:bold
+    classDef storageop fill:#78350f,stroke:#b45309,stroke-width:2px,color:#fff
+    classDef response fill:#06b6d4,stroke:#0e7490,stroke-width:2px,color:#fff
+    classDef external fill:#831843,stroke:#be185d,stroke-width:2px,color:#fff,font-weight:bold
+
+    class Trigger trigger
+    class UserAction,TradeData,JournalData,OrderReject context
+    class ContextAgg context
+    class FetchPortfolio,FetchTickers,FetchIndicators,FetchVolatility,FetchSentiment,BuildContext,BehaviorDetect,JournalHist context
+    class LLMExec llm
+    class DeterministicScore,ClientSetup,PromptConstruct1,PromptConstruct2,PromptConstruct3,PromptConstruct4,PromptConstruct5,PromptConstruct6,PromptConstruct7,APICall1,APICall2 llmstep
+    class Validation validation
+    class Fallback1,TypeCheck,JSONValidate,DataMap1,DataMap2,DataMap3,DataMap4,GenByField validation
+    class Persistence storage
+    class WriteToDB,WriteDecision,WriteJournal,WriteID,Commit,RollBack storageop
+    class UIFeedback response
+    class ResponsePack1,ResponsePack2,ResponsePack3,ResponsePack4,UIRender,WebsocketBroadcast response
+    class APICall1,APICall2 external

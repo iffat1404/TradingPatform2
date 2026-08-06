@@ -156,6 +156,60 @@ def get_tick_for_ticker_at_time(ticker: str, target_time: datetime, db: Session)
     return None
 
 
+def get_price_history_ohlcv(
+    db: Session,
+    symbol: str,
+    timeframe: str,
+    start_date: str,
+    end_date: str
+) -> Optional['pd.DataFrame']:
+    """
+    Fetch OHLCV data for backtesting.
+
+    Returns a pandas DataFrame with OHLCV columns indexed by timestamp.
+    Used for strategy backtesting.
+    """
+    import pandas as pd
+
+    # Parse dates
+    try:
+        start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+        end = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+    # Query minute data from database
+    prices = db.query(PriceHistoryMinute).filter(
+        PriceHistoryMinute.ticker == symbol,
+        PriceHistoryMinute.timestamp >= start,
+        PriceHistoryMinute.timestamp <= end
+    ).order_by(PriceHistoryMinute.timestamp.asc()).all()
+
+    if not prices:
+        return None
+
+    # Convert to DataFrame
+    data = []
+    for price in prices:
+        ts = price.timestamp
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+
+        data.append({
+            'timestamp': ts,
+            'open': price.open,
+            'high': price.high,
+            'low': price.low,
+            'close': price.close,
+            'volume': price.volume,
+        })
+
+    df = pd.DataFrame(data)
+    df.set_index('timestamp', inplace=True)
+
+    return df
+
+
 def reset_feed_simulator() -> None:
     """
     Reset the feed simulator to start from the beginning of the dataset.

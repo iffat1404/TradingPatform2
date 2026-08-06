@@ -1,0 +1,202 @@
+/* PerformanceCards Styles */
+
+.performance-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.performance-cards.empty,
+.performance-cards.skeleton {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.performance-cards.empty {
+  font-style: italic;
+}
+
+/* KPI Card Base */
+
+.kpi-card {
+  padding: 0.75rem;
+  border: 1px solid #2a2b30;
+  border-radius: 6px;
+  background: rgba(26, 27, 30, 0.5);
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #4b5563;
+  transition: all 0.2s;
+}
+
+.kpi-card:hover {
+  border-color: #3b3f47;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* KPI Card States */
+
+.kpi-card.positive::before {
+  background: #10b981;
+}
+
+.kpi-card.negative::before {
+  background: #ef4444;
+}
+
+.kpi-card.neutral::before {
+  background: #6b7280;
+}
+
+/* KPI Card Header */
+
+.kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-icon {
+  font-size: 1rem;
+}
+
+/* KPI Values */
+
+.kpi-values {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kpi-primary {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #e5e7eb;
+  font-family: 'Monaco', 'Courier New', monospace;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.kpi-primary {
+  color: #e5e7eb;
+}
+
+.kpi-card.positive .kpi-primary {
+  color: #10b981;
+}
+
+.kpi-card.negative .kpi-primary {
+  color: #ef4444;
+}
+
+.kpi-secondary {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  line-height: 1.2;
+}
+
+/* Dual Stat Card */
+
+.kpi-card.dual-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.dual-stat-left,
+.dual-stat-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dual-stat-divider {
+  width: 1px;
+  background: #2c2d32;
+  margin: 0 0.25rem;
+  min-height: 30px;
+}
+
+/* Responsive */
+
+@media (max-width: 1200px) {
+  .performance-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .kpi-primary {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .performance-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .kpi-card {
+    padding: 0.6rem;
+  }
+
+  .kpi-primary {
+    font-size: 0.9rem;
+  }
+
+  .kpi-card.dual-stat {
+    grid-column: 1 / -1;
+    padding: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .performance-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-card.dual-stat {
+    grid-column: auto;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .dual-stat-divider {
+    display: none;
+  }
+}
