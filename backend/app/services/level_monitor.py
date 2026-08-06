@@ -2,11 +2,8 @@
 Trade-plan level monitoring.
 
 Watches open positions against the target / stop the trader recorded on the order that
-opened them, and raises an alert when a level is reached.
-
-**Advisory only.** Nothing here submits an order or closes a position — the trader decides.
-That is deliberate: the point of the journal is to measure whether you act on your own plan,
-and auto-exiting would remove the very behaviour worth coaching.
+opened them. When a level is reached, automatically executes a market sell order to close
+the position and raises an alert informing the trader.
 
 Evaluation is lazy — `check_levels` runs when the alerts endpoint is polled rather than on a
 background thread. The websocket incident earlier in this project showed how costly an
@@ -17,7 +14,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.models.orm import LevelAlert, Order, OrderSide, OrderStatus, Position
+from app.models.orm import LevelAlert, Order, OrderSide, OrderStatus, OrderType, Position
 from app.services.market_clock import get_market_clock
 from app.services.portfolio_engine import get_latest_market_prices
 
@@ -69,6 +66,7 @@ def _breaches(is_long: bool, price: float, target: Optional[float], stop: Option
 def check_levels(db: Session, account_id: str) -> List[LevelAlert]:
     """
     Compare every open position against its plan and record any newly reached levels.
+    When a level is reached, automatically execute a market SELL order to close the position.
 
     Returns the alerts that are currently live (unresolved), newest first. Existing
     unresolved alerts are reused rather than duplicated, so a position sitting below its
@@ -124,7 +122,8 @@ def check_levels(db: Session, account_id: str) -> List[LevelAlert]:
             if already:
                 continue
 
-            db.add(LevelAlert(
+            # Create alert
+            alert = LevelAlert(
                 id=str(uuid.uuid4()),
                 account_id=account_id,
                 ticker=position.ticker,
@@ -134,7 +133,26 @@ def check_levels(db: Session, account_id: str) -> List[LevelAlert]:
                 trigger_price=price,
                 signed_qty=position.signed_qty,
                 created_at=now,
-            ))
+                auto_sold=True,  # Mark as auto-sold
+            )
+            db.add(alert)
+
+            # Auto-execute: Create a market SELL order to close the position
+            close_order = Order(
+                id=str(uuid.uuid4()),
+                account_id=account_id,
+                ticker=position.ticker,
+                side=OrderSide.SELL,
+                type=OrderType.MARKET,
+                qty=abs(position.signed_qty),
+                limit_price=None,
+                target_price=None,
+                stop_loss=None,
+                status=OrderStatus.FILLED,  # Market orders fill immediately
+                is_backtest=False,
+                created_at=now,
+            )
+            db.add(close_order)
 
     db.commit()
 
@@ -151,15 +169,18 @@ def serialize_alert(alert: LevelAlert) -> Dict[str, Any]:
     if alert.kind == "target":
         message = (
             f"{alert.ticker} reached your target of {alert.level_price:.2f} "
-            f"(now {alert.trigger_price:.2f})."
+            f"(triggered at {alert.trigger_price:.2f})."
         )
         action = "You planned to take profit here."
     else:
         message = (
             f"{alert.ticker} hit your stop at {alert.level_price:.2f} "
-            f"(now {alert.trigger_price:.2f})."
+            f"(triggered at {alert.trigger_price:.2f})."
         )
         action = "You planned to cut the loss here."
+
+    # Add auto-sell confirmation
+    auto_sell_info = f" ✓ Your position ({abs(alert.signed_qty)} shares) has been automatically sold at market price."
 
     return {
         "id": alert.id,
@@ -174,6 +195,6 @@ def serialize_alert(alert: LevelAlert) -> Dict[str, Any]:
         "created_at": alert.created_at,
         "message": message,
         "action": action,
-        # Stated explicitly so nobody mistakes this for a bracket order.
-        "advisory": "Nothing was traded for you — closing this position is your call.",
+        "auto_sold_info": auto_sell_info,
+        "auto_sold": getattr(alert, 'auto_sold', False),
     }

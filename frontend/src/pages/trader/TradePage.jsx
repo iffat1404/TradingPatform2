@@ -30,7 +30,7 @@ export function TradePage() {
   const [ticker, setTicker] = useState(() =>
     prefill?.ticker && TICKERS.includes(prefill.ticker.toUpperCase()) ? prefill.ticker.toUpperCase() : TICKERS[0]
   );
-  const [chartMode, setChartMode] = useState('historical');
+  const [chartMode, setChartMode] = useState('intraday');
   const [intradayInterval, setIntradayInterval] = useState('5m');
   const [dailyData, setDailyData] = useState([]);
   const [intradayRaw, setIntradayRaw] = useState([]);
@@ -309,18 +309,17 @@ export function TradePage() {
 
             {tick?.spread && (
               <div className="market-depth-box">
-                <div className="depth-cell bid-cell">
-                  <span className="depth-label">BID</span>
-                  <span className="depth-value">{formatCurrency(tick.spread.bid)}</span>
-                </div>
-                <div className="depth-cell spread-cell">
-                  <span className="depth-label">SPREAD</span>
-                  <span className="depth-value">{formatCurrency(tick.spread.spread)}</span>
-                </div>
+
                 <div className="depth-cell ask-cell">
                   <span className="depth-label">ASK</span>
                   <span className="depth-value">{formatCurrency(tick.spread.ask)}</span>
                 </div>
+
+                <div className="depth-cell bid-cell">
+                  <span className="depth-label">BID</span>
+                  <span className="depth-value">{formatCurrency(tick.spread.bid)}</span>
+                </div>
+                
               </div>
             )}
 

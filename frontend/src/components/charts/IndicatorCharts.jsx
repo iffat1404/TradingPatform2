@@ -19,6 +19,52 @@ export function PriceMaChart({ data, height = 240 }) {
   );
 }
 
+export function BollingerBandsChart({ data, height = 280 }) {
+  if (!data?.length) return <div className="empty-state">No Bollinger Band data.</div>;
+
+  const filteredData = data.filter(d => d.close !== null && d.bbUpper !== null && d.bbLower !== null);
+  if (!filteredData.length) return <div className="empty-state">No Bollinger Band data.</div>;
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={filteredData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} minTickGap={40} />
+        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={54} />
+        <Tooltip
+          contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+        />
+        <Line type="monotone" dataKey="close" stroke="var(--text)" strokeWidth={2} dot={false} name="Price" />
+        <Line type="monotone" dataKey="bbUpper" stroke="var(--negative)" strokeWidth={1} dot={false} name="Upper Band" strokeDasharray="5 5" />
+        <Line type="monotone" dataKey="bbMiddle" stroke="var(--info)" strokeWidth={1} dot={false} name="Middle Band" />
+        <Line type="monotone" dataKey="bbLower" stroke="var(--positive)" strokeWidth={1} dot={false} name="Lower Band" strokeDasharray="5 5" />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function MacdChart({ data, height = 280 }) {
+  if (!data?.length) return <div className="empty-state">No MACD data.</div>;
+
+  const filteredData = data.filter(d => d.macd !== null && d.macdSignal !== null);
+  if (!filteredData.length) return <div className="empty-state">No MACD data.</div>;
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={filteredData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} minTickGap={40} />
+        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={54} />
+        <Tooltip
+          contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+        />
+        <Line type="monotone" dataKey="macd" stroke="var(--positive)" strokeWidth={2} dot={false} name="MACD" />
+        <Line type="monotone" dataKey="macdSignal" stroke="var(--negative)" strokeWidth={1.5} dot={false} name="Signal" />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function RsiGauge({ value }) {
   if (value === null || value === undefined) return <div className="empty-state">No RSI data.</div>;
   const pct = Math.max(0, Math.min(100, value));

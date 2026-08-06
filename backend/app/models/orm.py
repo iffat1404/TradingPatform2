@@ -474,6 +474,8 @@ class LevelAlert(Base):
     # Set once the position is closed or flipped, so the same level can fire again later.
     resolved = Column(Boolean, default=False, nullable=False)
     resolved_at = Column(DateTime, nullable=True)
+    # Track if position was automatically sold when level was hit
+    auto_sold = Column(Boolean, default=False, nullable=False)
 
     created_at = Column(DateTime, default=utcnow, nullable=False)
 

@@ -25,6 +25,20 @@
   border-left: 3px solid var(--positive);
 }
 
+/* Auto-sold alerts have a green success state */
+.level-alert.auto-sold {
+  border-color: var(--positive);
+  background: color-mix(in srgb, var(--positive) 8%, transparent);
+}
+
+.level-alert.auto-sold.level-alert-stop {
+  border-left-color: var(--positive);
+}
+
+.level-alert.auto-sold.level-alert-target {
+  border-left-color: var(--positive);
+}
+
 .level-alert-kind {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -49,6 +63,14 @@
 .level-alert-action {
   font-size: 12.5px;
   color: var(--text-muted);
+}
+
+.level-alert-auto-sold {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--positive);
+  width: 100%;
+  order: 4;
 }
 
 .level-alert-buttons {

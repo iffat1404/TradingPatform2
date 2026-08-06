@@ -71,14 +71,26 @@ export function PortfolioPage() {
 
   const positions = portfolio?.positions || [];
 
-  // The dedicated /portfolio/exposure endpoint returns a plain list; the report endpoint's
-  // metrics carry the same data as dicts keyed by ticker/sector. Support either shape so a
-  // change on one side doesn't blank out this panel.
+  // The /portfolio/exposure endpoint returns an array of ticker objects with sector info
+  // Aggregate sector data from that array
   const byTicker = Array.isArray(exposure)
-    ? exposure
-    : Object.values(exposure?.by_ticker || exposure?.ticker_exposure || report?.metrics?.ticker_exposure || {});
-  const sectorSource = (!Array.isArray(exposure) && (exposure?.by_sector || exposure?.sector_exposure)) || report?.metrics?.sector_exposure;
-  const bySector = Object.entries(sectorSource || {}).map(([name, data]) => ({ name, ...data }));
+    ? exposure.map(item => ({
+        ticker: item.ticker,
+        percentage: item.exposure_pct,
+        pct: item.exposure_pct
+      }))
+    : [];
+
+  const bySector = Array.isArray(exposure)
+    ? Object.entries(
+        exposure.reduce((acc, item) => {
+          const sector = item.sector || 'Other';
+          if (!acc[sector]) acc[sector] = { name: sector, exposure_pct: 0 };
+          acc[sector].exposure_pct += item.exposure_pct || 0;
+          return acc;
+        }, {})
+      ).map(([name, data]) => ({ name, percentage: data.exposure_pct, pct: data.exposure_pct }))
+    : [];
 
   return (
     <div className="page-section">
@@ -162,9 +174,9 @@ export function PortfolioPage() {
             byTicker.map((row, i) => {
               const pct = row.percentage ?? row.pct ?? 0;
               return (
-                <div className="exposure-bar-row" key={row.ticker || row.symbol || i}>
+                <div className="exposure-bar-row" key={row.ticker || i}>
                   <div className="exposure-bar-label">
-                    <span className="font-mono">{row.ticker || row.symbol}</span>
+                    <span className="font-mono">{row.ticker}</span>
                     <span className="mono-num">{formatPercent(pct)}</span>
                   </div>
                   <div className="exposure-bar-track">

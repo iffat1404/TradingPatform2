@@ -16,13 +16,20 @@ export const toDailyPoints = (rows = []) =>
   });
 
 // Intraday bars come as { timestamp: "2026-07-01 09:31:00", ... } — minute-level, no timezone
-// suffix, always UTC per the backend's own convention.
+// suffix. The backend returns timestamps that are already in UTC, but as strings.
+// We parse them as UTC explicitly by appending 'Z'.
 export const toIntradayPoints = (rows = []) =>
   rows.map((r) => {
+    // Backend returns timestamp as "YYYY-MM-DD HH:MM:SS" string
+    // Treat it as UTC by appending Z
     const iso = `${r.timestamp.replace(' ', 'T')}Z`;
     const timestamp = new Date(iso).getTime();
+
+    // Store the full original timestamp string for display
+    const fullTimestamp = r.timestamp; // e.g., "2026-07-01 09:31:00"
+
     return {
-      label: r.timestamp.slice(11, 16),
+      label: fullTimestamp,
       dateKey: r.timestamp.slice(0, 10),
       t: timestamp,
       timestamp,
@@ -34,12 +41,11 @@ export const toIntradayPoints = (rows = []) =>
     };
   });
 
-// Intraday data covers a fixed simulated window (Jul 1 - Aug 30). A trader should only ever
-// see bars up to "now" on the MarketClock, and only for the current simulated trading day —
-// never the full multi-week dataset at once.
+// Intraday data covers a fixed simulated window (Jul 1 - Aug 30).
+// For intraday chart, return all data for the current trading day (full day scroll available),
+// not just data up to "now". This allows users to scroll left/right through full day data.
 export const filterToSimulatedDay = (points, simulatedTimeIso) => {
   if (!simulatedTimeIso) return [];
-  const now = new Date(simulatedTimeIso).getTime();
   const dayKey = simulatedTimeIso.slice(0, 10);
-  return points.filter((p) => p.dateKey === dayKey && p.t <= now);
+  return points.filter((p) => p.dateKey === dayKey);
 };

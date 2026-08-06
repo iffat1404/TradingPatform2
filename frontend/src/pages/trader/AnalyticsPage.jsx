@@ -4,7 +4,7 @@ import { getIndicators, getAlerts, getSentimentDivergence } from '../../api/anal
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/common/Button';
-import { RsiGauge, MacdPanel, BollingerPanel, PriceMaChart } from '../../components/charts/IndicatorCharts';
+import { RsiGauge, MacdPanel, BollingerPanel, PriceMaChart, BollingerBandsChart, MacdChart } from '../../components/charts/IndicatorCharts';
 import { formatDateTime, formatPercent } from '../../utils/format';
 import './trader-pages.css';
 
@@ -25,6 +25,13 @@ const toSeries = (ind) => {
     close: ind.close?.[i] ?? null,
     sma20: ind.sma_20?.[i] ?? null,
     sma50: ind.sma_50?.[i] ?? null,
+    rsi: ind.rsi_14?.[i] ?? null,
+    macd: ind.macd?.macd?.[i] ?? null,
+    macdSignal: ind.macd?.signal?.[i] ?? null,
+    macdHistogram: ind.macd?.histogram?.[i] ?? null,
+    bbUpper: ind.bollinger_bands?.upper?.[i] ?? null,
+    bbMiddle: ind.bollinger_bands?.middle?.[i] ?? null,
+    bbLower: ind.bollinger_bands?.lower?.[i] ?? null,
   }));
 };
 
@@ -100,13 +107,6 @@ export function AnalyticsPage() {
         <div className="loading-row">Loading indicators…</div>
       ) : (
         <>
-          <div className="stat-row">
-            <StatCard label="SMA 20" value={indicators?.sma_20?.toFixed?.(2) ?? '—'} />
-            <StatCard label="SMA 50" value={indicators?.sma_50?.toFixed?.(2) ?? '—'} />
-            <StatCard label="EMA 12" value={indicators?.ema_12?.toFixed?.(2) ?? '—'} />
-            <StatCard label="EMA 26" value={indicators?.ema_26?.toFixed?.(2) ?? '—'} />
-          </div>
-
           <Card title={`${ticker} — price vs. moving averages`}>
             <PriceMaChart data={series} />
           </Card>
@@ -114,12 +114,6 @@ export function AnalyticsPage() {
           <div className="indicator-grid">
             <Card title="RSI">
               <RsiGauge value={indicators?.rsi_14} />
-            </Card>
-            <Card title="MACD">
-              <MacdPanel macd={indicators?.macd} />
-            </Card>
-            <Card title="Bollinger Bands">
-              <BollingerPanel bands={indicators?.bollinger_bands} />
             </Card>
             <Card title="Alerts">
               {alerts.length ? (
@@ -136,28 +130,15 @@ export function AnalyticsPage() {
             </Card>
           </div>
 
-          <Card title="Sentiment divergence">
-            <div className="filters-row">
-              <div className="field">
-                <label>Date</label>
-                <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-              <Button variant="secondary" onClick={checkDivergence} loading={divLoading}>
-                Check divergence
-              </Button>
-            </div>
-            {divergence && (
-              <div className="stat-row" style={{ marginTop: 16 }}>
-                <StatCard label="Sentiment score" value={divergence.sentiment_score?.toFixed?.(2) ?? '—'} />
-                <StatCard label="Price change" value={formatPercent((divergence.price_change || 0) * 100)} />
-                <StatCard
-                  label="Divergence"
-                  value={divergence.divergence_detected ? 'Detected' : 'None'}
-                  deltaTone={divergence.divergence_detected ? 'delta-negative' : 'delta-positive'}
-                />
-              </div>
-            )}
+          <Card title={`${ticker} — Bollinger Bands (20-day)`} style={{ marginTop: 16 }}>
+            <BollingerBandsChart data={series} />
           </Card>
+
+          <Card title={`${ticker} — MACD`} style={{ marginTop: 16 }}>
+            <MacdChart data={series} />
+          </Card>
+
+
         </>
       )}
     </div>

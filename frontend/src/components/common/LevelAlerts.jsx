@@ -7,10 +7,8 @@ import './LevelAlerts.css';
 /**
  * Banner telling the trader their own target or stop has been reached.
  *
- * Deliberately does NOT offer a one-click exit: the platform never trades for you, and the
- * journal's value comes from measuring whether you act on your own plan. Dismissing marks
- * the alert seen — it does not close anything, and the alert returns until the position is
- * actually flat.
+ * When a level is hit, the position is automatically sold at market price.
+ * The alert informs the trader that their position has been closed according to their plan.
  */
 
 const POLL_MS = 20000;
@@ -52,18 +50,23 @@ export function LevelAlerts() {
   return (
     <div className="level-alerts">
       {visible.map((a) => (
-        <div className={`level-alert level-alert-${a.kind}`} key={a.id} role="status">
+        <div className={`level-alert level-alert-${a.kind}${a.auto_sold ? ' auto-sold' : ''}`} key={a.id} role="status">
           <span className="level-alert-kind">{a.kind === 'stop' ? 'Stop hit' : 'Target hit'}</span>
           <span className="level-alert-msg">{a.message}</span>
           <span className="level-alert-action">{a.action}</span>
+          {a.auto_sold && (
+            <span className="level-alert-auto-sold">✓ {a.auto_sold_info}</span>
+          )}
           <div className="level-alert-buttons">
-            <button
-              className="btn btn-secondary btn-sm"
-              type="button"
-              onClick={() => navigate('/trader/trade', { state: { prefill: { ticker: a.ticker, side: a.signed_qty > 0 ? 'sell' : 'buy' } } })}
-            >
-              Review position
-            </button>
+            {!a.auto_sold && (
+              <button
+                className="btn btn-secondary btn-sm"
+                type="button"
+                onClick={() => navigate('/trader/trade', { state: { prefill: { ticker: a.ticker, side: a.signed_qty > 0 ? 'sell' : 'buy' } } })}
+              >
+                Review position
+              </button>
+            )}
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => dismiss(a.id)}>
               Dismiss
             </button>
